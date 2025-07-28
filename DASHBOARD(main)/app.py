@@ -30,7 +30,7 @@ else:
     if data is not None:
         st.write(f"**Nama:** {data['Nama']}")
         st.write(f"**Alamat:** {data['Alamat']}")
-        st.write(f"**Pajak Terhutang:** Rp{data['Pajak_Terhutang']:,}")
+        st.write(f"**Pajak Terhutang:** Rp{int(data['Pajak_Terhutang']):,}".replace(",", "."))
         st.write(f"**Jatuh Tempo:** {data['Tanggal_Jatuh_Tempo']}")
 
         if st.button("Bayar Sekarang"):
