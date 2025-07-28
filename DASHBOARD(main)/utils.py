@@ -1,32 +1,25 @@
 import pandas as pd
-from datetime import datetime
+
+def load_user_data():
+    return pd.read_excel("DASHBOARD(main)/data_user.xlsx")
 
 def cek_login(nik, plat):
-    df = pd.read_csv("DASHBOARD(main)/data_kendaraan.csv", dtype=str)
-    match = df[(df['NIK'] == nik) & (df['Plat'].str.upper() == plat.upper())]
-    return not match.empty
+    df = load_user_data()
+    user = df[(df['NIK'] == nik) & (df['Plat'] == plat)]
+    return user if not user.empty else None
 
-def get_info_kendaraan(nik, plat):
-    df = pd.read_csv("DASHBOARD(main)/data_kendaraan.csv", dtype=str)
-    match = df[(df['NIK'] == nik) & (df['Plat'].str.upper() == plat.upper())]
-    if not match.empty:
-        return match.iloc[0]
-    return None
-
-def simpan_riwayat(data):
-    path = "DASHBOARD(main)/riwayat_pembayaran.csv"
-    try:
-        df_riwayat = pd.read_csv(path)
-    except FileNotFoundError:
-        df_riwayat = pd.DataFrame(columns=["NIK", "Plat", "Nama", "Tanggal_Bayar", "Jumlah"])
-
-    new_row = {
-        "NIK": data["NIK"],
-        "Plat": data["Plat"],
-        "Nama": data["Nama"],
-        "Tanggal_Bayar": datetime.today().strftime('%Y-%m-%d'),
-        "Jumlah": data["Pajak_Terhutang"]
-    }
-
-    df_riwayat = pd.concat([df_riwayat, pd.DataFrame([new_row])], ignore_index=True)
-    df_riwayat.to_csv(path, index=False)
+def daftar_akun(nik, plat, nama, alamat):
+    df = load_user_data()
+    if ((df['NIK'] == nik) & (df['Plat'] == plat)).any():
+        return False
+    new_user = pd.DataFrame([{
+        "NIK": nik,
+        "Plat": plat,
+        "Nama": nama,
+        "Alamat": alamat,
+        "Pajak_Terhutang": 500000,
+        "Tanggal_Jatuh_Tempo": "2025-08-30"
+    }])
+    df = pd.concat([df, new_user], ignore_index=True)
+    df.to_excel("DASHBOARD(main)/data_user.xlsx", index=False)
+    return True
