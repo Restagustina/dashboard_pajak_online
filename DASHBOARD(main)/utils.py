@@ -2,12 +2,12 @@ import pandas as pd
 from datetime import datetime
 
 def cek_login(nik, plat):
-    df = pd.read_csv("DASHBOARD(main)/data_kendaraan.csv")
+    df = pd.read_csv("DASHBOARD(main)/data_kendaraan.csv", dtype=str)
     match = df[(df['NIK'] == nik) & (df['Plat'].str.upper() == plat.upper())]
     return not match.empty
 
 def get_info_kendaraan(nik, plat):
-    df = pd.read_csv("DASHBOARD(main)/data_kendaraan.csv")
+    df = pd.read_csv("DASHBOARD(main)/data_kendaraan.csv", dtype=str)
     match = df[(df['NIK'] == nik) & (df['Plat'].str.upper() == plat.upper())]
     if not match.empty:
         return match.iloc[0]
