@@ -14,7 +14,7 @@ def get_info_kendaraan(nik, plat):
     return None
 
 def simpan_riwayat(data):
-    path = "riwayat_pembayaran.csv"
+    path = "DASHBOARD(main)/riwayat_pembayaran.csv"
     try:
         df_riwayat = pd.read_csv(path)
     except FileNotFoundError:
