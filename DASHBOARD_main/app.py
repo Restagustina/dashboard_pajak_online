@@ -4,19 +4,37 @@ import os
 import streamlit as st
 from utils import load_data, save_data 
 
-st.markdown(
-    """
-    <style>
-    .stApp {
-        background-image: url('DASHBOARD_main/assets/samsatplg1.jpg');
-        background-size: cover;
-        background-repeat: no-repeat;
-        background-attachment: fixed;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
+import base64  # karena pakai base64 di fungsi `set_background`
+
+# --- path gambar ---
+BASE_PATH = os.path.dirname(os.path.abspath(__file__))
+image_path = os.path.join(BASE_PATH, "assets", "samsatplg1.jpg")
+
+# --- Fungsi background dengan transparansi ---
+def set_background(image_file):
+    with open(image_file, "rb") as image:
+        encoded = base64.b64encode(image.read()).decode()
+    st.markdown(
+        f"""
+        <style>
+        .stApp {{
+            background-image: url("data:image/jpg;base64,{encoded}");
+            background-size: cover;
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+        }}
+        .main > div {{
+            background-color: rgba(255, 255, 255, 0.20);  /* transparansi konten */
+            padding: 2rem;
+            border-radius: 15px;
+        }}
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+
+# --- Jalankan fungsi background ---
+set_background(image_path)
 
 # -------------------------------
 # LOAD DATA
@@ -80,7 +98,7 @@ def login_page():
 
     # Tangkap klik tombol HTML dengan deteksi submit manual
     if st.session_state.get("page") != "register" and st.session_state.get("form_submitted", False) is False:
-        if st.experimental_get_query_params():  # Deteksi URL berubah karena klik submit
+        if st.query_params:  # Deteksi URL berubah karena klik submit
             st.session_state.page = "register"
             st.session_state.form_submitted = True
             st.rerun()
