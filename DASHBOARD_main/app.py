@@ -4,6 +4,20 @@ import os
 import streamlit as st
 from utils import load_data, save_data 
 
+st.markdown(
+    """
+    <style>
+    .stApp {
+        background-image: url('DASHBOARD_main/assets/samsatplg1.jpg');
+        background-size: cover;
+        background-repeat: no-repeat;
+        background-attachment: fixed;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
 # -------------------------------
 # LOAD DATA
 # -------------------------------
