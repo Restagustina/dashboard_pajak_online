@@ -1,9 +1,30 @@
 import streamlit as st
 import pandas as pd
-from datetime import datetime
+from datetime import date, timedelta
 import os
 import base64
 from utils import load_data, save_data
+
+# -------------------------------
+# SESSION STATE & QUERY PARAM DETECTION
+# -------------------------------
+if 'page' not in st.session_state:
+    st.session_state.page = 'login'
+if 'user_data' not in st.session_state:
+    st.session_state.user_data = {}
+if 'form_submitted' not in st.session_state:
+    st.session_state.form_submitted = False
+if 'registration_success' not in st.session_state:
+    st.session_state.registration_success = False
+
+# -------------------------------
+# DETEKSI ?daftar=true
+# -------------------------------
+query_params = st.query_params
+if query_params.get("daftar", [""])[0].lower() == "true":
+    st.session_state.page = "register"
+    st.query_params.clear()  # hapus param biar tidak rerun terus
+    st.rerun()
 
 # -------------------------------
 # SET BACKGROUND
@@ -46,19 +67,13 @@ set_background(image_path)  # SET BACKGROUND di awal
 df_user, df_kendaraan, df_riwayat = load_data()
 
 # -------------------------------
-# SESSION STATE
-# -------------------------------
-if 'page' not in st.session_state:
-    st.session_state.page = 'login'
-if 'user_data' not in st.session_state:
-    st.session_state.user_data = {}
-if 'form_submitted' not in st.session_state:
-    st.session_state.form_submitted = False
-
-# -------------------------------
 # LOGIN PAGE
 # -------------------------------
 def login_page():
+    if st.session_state.get("registration_success", False):
+        st.success("✅ Akun berhasil didaftarkan. Silakan login.")
+        st.session_state.registration_success = False  # reset di sini setelah ditampilkan
+
     st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Anton&display=swap');
@@ -97,9 +112,10 @@ def login_page():
     input_nik = st.text_input("Masukkan NIK").strip()
     input_plat = st.text_input("Masukkan Plat").strip().upper()
 
-    # Tombol Login biasa (biarkan default)
+    # Tombol Login default
     login_clicked = st.button("Login", key="login_button")
 
+    # Tombol Registrasi
     # Tombol Registrasi
     st.markdown("""
     <style>
@@ -115,26 +131,31 @@ def login_page():
         margin-right: 8px;
     }
 
-    .register-link {
-        color: white; /* ubah warna jadi putih */
-        background-color: transparent;
-        padding: 6px 12px;
-        border-radius: 5px;
+    .register-button {
+        background: none;
+        border: none;
+        color: white;
         font-weight: bold;
-        text-decoration: none;
-        transition: color 0.3s ease;
+        text-decoration: underline;
+        cursor: pointer;
     }
 
-    .register-link:hover {
-        color: #ffcdd2; /* efek hover jadi merah muda */
+    .register-button:hover {
+        color: #ffcdd2;
     }
     </style>
 
     <div class="info-text">
         <span>Belum Punya Akun?</span>
-        <a href="?daftar=true" class="register-link">Registrasi Now</a>
     </div>
-""", unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
+
+    # Tombol "Registrasi Now" (streamlit button terlihat seperti link)
+    col1, col2, col3 = st.columns([3, 2, 3])
+    with col2:
+        if st.button("Registrasi Now", key="register_now"):
+            st.session_state.page = "register"
+            st.rerun()
 
 
     # Login logic
@@ -154,17 +175,17 @@ def login_page():
         else:
             st.error("❌ Data tidak ditemukan. Periksa kembali NIK dan Plat.")
 
-    if st.query_params.get("daftar") == "true":
-        st.session_state.page = "register"
-        st.rerun()
+ # Tombol fallback untuk hapus param ?daftar=true
+    query_params = st.query_params
+    if query_params.get("daftar", [""])[0].lower() == "true":
+        if st.button("🔐 Kembali ke Halaman Login", use_container_width=True):
+            st.query_params.clear()  # hapus param dari URL
+            st.session_state.page = "login"
+            st.rerun()
 
 # -------------------------------
 # REGISTER PAGE
 # -------------------------------
-from datetime import date, timedelta
-import pandas as pd
-import streamlit as st
-
 def register_page():
     st.markdown("""
     <style>
@@ -242,9 +263,10 @@ def register_page():
     else:
         st.markdown("<div style='text-align: center;'>", unsafe_allow_html=True)
         st.success("✅ Akun berhasil didaftarkan. Silakan login.")
-        if st.button("🔐 Kembali ke Halaman Login", use_container_width=True):
+        # Gunakan tombol yang hanya tampil di register_page
+        if st.button("🔐 Kembali ke Halaman Login", use_container_width=True, key="back_to_login_from_register"):
             st.session_state.page = "login"
-            st.session_state.registration_success = False
+            st.query_params.clear() # hapus query param ?daftar=true
             st.rerun()
         st.markdown("</div>", unsafe_allow_html=True)
 
