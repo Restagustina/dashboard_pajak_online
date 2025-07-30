@@ -27,7 +27,7 @@ def set_background(image_path):
         left: 0;
         width: 100%;
         height: 100%;
-        backdrop-filter: blur(4px); /* Efek blur */
+        backdrop-filter: blur(7px); /* Efek blur */
     }}
     </style>
     """
@@ -80,7 +80,7 @@ def login_page():
         text-align: center;
         font-size: 18px;
         color: white;
-        margin-top: -5px;
+        margin-top: 0px;
         margin-bottom: 30px; /* tambahkan jarak bawah sub title to input nik
         font-family: 'Arial', sans-serif;
         letter-spacing: 1px;
@@ -97,24 +97,46 @@ def login_page():
 
     input_nik = st.text_input("Masukkan NIK").strip()
     input_plat = st.text_input("Masukkan Plat").strip().upper()
-    login_clicked = st.button("Login")
 
-    daftar_html = """
-        <form action="" method="post">
-            <input type="submit" value="Daftar Akun Baru"
-            style="
-                background-color: #e53935;
-                color: white;
-                padding: 0.5em 1em;
-                border: none;
-                border-radius: 5px;
-                font-size: 16px;
-                margin-top: 10px;
-                cursor: pointer;
-            "></form>
-    """
-    st.markdown(daftar_html, unsafe_allow_html=True)
+    # Tombol Login biasa (biarkan default)
+    login_clicked = st.button("Login", key="login_button")
 
+    # HTML Tombol Custom untuk "Daftar Akun Baru"
+    st.markdown("""
+        <style>
+        .custom-button {
+            background-color: #d32f2f;
+            color: white;
+            padding: 0.5em 1em;
+            font-size: 16px;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            margin-top: 10px;
+            transition: background-color 0.3s ease;
+        }
+
+        .custom-button:hover {
+            background-color: #b71c1c;
+            cursor: pointer;
+        }
+
+        .custom-button:active {
+            background-color: #a30000;
+            transform: scale(0.97);
+        }
+        </style>
+
+        <form action="?daftar=true">
+            <button class="custom-button" type="submit">Daftar Akun Baru</button>
+        </form>
+    """, unsafe_allow_html=True)
+
+    if st.query_params.get("daftar") == "true":
+        st.session_state.page = "register"
+        st.rerun()
+
+    # Login logic
     if login_clicked:
         user_match = data_user[data_user['NIK'] == input_nik]
         kendaraan_match = df_kendaraan[df_kendaraan['Plat'].str.upper() == input_plat]
@@ -131,102 +153,54 @@ def login_page():
         else:
             st.error("❌ Data tidak ditemukan. Periksa kembali NIK dan Plat.")
 
-    if st.query_params and not st.session_state.form_submitted:
+    if st.query_params.get("daftar") == "true":
         st.session_state.page = "register"
-        st.session_state.form_submitted = True
         st.rerun()
 
 # -------------------------------
 # REGISTER PAGE
 # -------------------------------
-import streamlit as st
-import base64
-
 def register_page():
-    st.set_page_config(layout="centered")
-
-    # Load background image & encode to base64
-    with open("assets/bg.jpg", "rb") as image_file:
-        encoded = base64.b64encode(image_file.read()).decode()
-
-    # CSS style sama persis seperti login
-    css = f"""
+    st.markdown("""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Anton&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap');
 
-    .custom-title {{
-        font-size: 60px;
+    .judul {
+        font-family: 'Poppins', sans-serif;
+        font-size: 40px;
         font-weight: bold;
         text-align: center;
-        text-transform: uppercase;
-        font-family: 'Anton', sans-serif;
-        background: linear-gradient(to right, yellow, white);
+        background: linear-gradient(to top left, yellow, white);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         margin-bottom: 0px;
-    }}
-
-    .custom-subtitle {{
-        text-align: center;
-        font-size: 16px;
-        color: white;
-        margin-top: -10px;
-        margin-bottom: 30px;
-    }}
-
-    .stApp {{
-        background-image: url("data:image/jpg;base64,{encoded}");
-        background-size: cover;
-        background-position: center;
-        background-repeat: no-repeat;
-        backdrop-filter: blur(4px);
-    }}
-
-    .stTextInput > div > div > input {{
-        background-color: rgba(33, 33, 33, 0.9);
-        color: white;
-    }}
-
-    .stButton>button {{
-        background-color: #dc3545;
-        color: white;
-        font-weight: bold;
-        padding: 10px 24px;
-        border-radius: 8px;
-        border: none;
-        margin-top: 20px;
-    }}
+    }
     </style>
-    """
 
-    st.markdown(css, unsafe_allow_html=True)
+    <div class='judul'>Daftar Akun Baru</div>
+""", unsafe_allow_html=True)
 
-    # Judul
-    st.markdown('<div class="custom-title">SIMANPA I</div>', unsafe_allow_html=True)
-    st.markdown('<div class="custom-subtitle">Sistem Informasi Pembayaran Pajak Kendaraan Online</div>', unsafe_allow_html=True)
+    with st.form("register_form"):
+        nik = st.text_input("Masukkan NIK").strip()
+        nama = st.text_input("Masukkan Nama Lengkap").strip()
+        plat = st.text_input("Masukkan Plat Kendaraan").strip().upper()
+        pajak = st.text_input("Masukkan Jumlah Pajak (Rp)").strip()
 
-    # Form Registrasi
-    nama = st.text_input("Masukkan Nama Lengkap")
-    nik = st.text_input("Masukkan NIK")
-    plat = st.text_input("Masukkan Plat Nomor")
-    password = st.text_input("Masukkan Password", type="password")
-    konfirmasi = st.text_input("Konfirmasi Password", type="password")
+        submit = st.form_submit_button("Daftar")
 
-    if st.button("Daftar"):
-        if password != konfirmasi:
-            st.error("Password dan konfirmasi tidak sama.")
-        elif nama and nik and plat:
-            # Simpan data ke Excel (atau database)
-            st.success("Pendaftaran berhasil! Silakan login.")
+    if submit:
+        if nik and nama and plat and pajak:
+            # Simpan ke Excel lewat utils.py
+            new_user = pd.DataFrame([{"NIK": nik, "Nama": nama}])
+            new_kendaraan = pd.DataFrame([{"NIK": nik, "Plat": plat, "Pajak": pajak}])
+
+            save_data(new_user, new_kendaraan)
+            st.success("✅ Akun berhasil didaftarkan. Silakan login.")
             st.session_state.page = "login"
+            st.session_state.form_submitted = False
             st.rerun()
         else:
-            st.warning("Semua kolom harus diisi.")
-
-    # Tombol kembali
-    if st.button("Kembali ke Login"):
-        st.session_state.page = "login"
-        st.rerun()
+            st.error("❌ Harap lengkapi semua data.")
 
 # -------------------------------
 # DASHBOARD PAGE
@@ -273,9 +247,9 @@ def dashboard_page():
 # -------------------------------
 # ROUTING HALAMAN
 # -------------------------------
-if st.session_state.page == 'login':
+if st.session_state.page == "login":
     login_page()
-elif st.session_state.page == 'register':
+elif st.session_state.page == "register":
     register_page()
-elif st.session_state.page == 'dashboard':
-    dashboard_page()
+elif st.session_state.page == "dashboard":
+    dashboard_page()  
