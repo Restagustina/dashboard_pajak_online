@@ -162,6 +162,8 @@ def login_page():
 # REGISTER PAGE
 # -------------------------------
 from datetime import date, timedelta
+import pandas as pd
+import streamlit as st
 
 def register_page():
     st.markdown("""
@@ -183,60 +185,68 @@ def register_page():
     <div class='judul'>Daftar Akun Baru</div>
     """, unsafe_allow_html=True)
 
-    with st.form("register_form"):
-        nik = st.text_input("Masukkan NIK").strip()
-        nama = st.text_input("Masukkan Nama Lengkap").strip()
-        alamat = st.text_input("Masukkan Alamat").strip()
-        plat = st.text_input("Masukkan Plat Kendaraan").strip().upper()
-        pajak = st.number_input("Masukkan Jumlah Pajak (Rp)", min_value=0)
-        default_tempo = date.today() + timedelta(days=365)
-        tanggal_jatuh_tempo = st.date_input("Masukkan Tanggal Jatuh Tempo", value=default_tempo)
+    if 'registration_success' not in st.session_state:
+        st.session_state.registration_success = False
 
-        submit = st.form_submit_button("Daftar")
+    if not st.session_state.registration_success:
+        with st.form("register_form"):
+            nik = st.text_input("Masukkan NIK").strip()
+            nama = st.text_input("Masukkan Nama Lengkap").strip()
+            alamat = st.text_input("Masukkan Alamat").strip()
+            plat = st.text_input("Masukkan Plat Kendaraan").strip().upper()
+            pajak = st.number_input("Masukkan Jumlah Pajak (Rp)", min_value=0)
+            default_tempo = date.today() + timedelta(days=365)
+            tanggal_jatuh_tempo = st.date_input("Masukkan Tanggal Jatuh Tempo", value=default_tempo)
 
-    if submit:
-        # Validasi input wajib
-        if not nik or not nama or not alamat or not plat or pajak <= 0:
-            st.error("❌ Harap lengkapi semua data dengan benar.")
-            return
-        
-        # Validasi panjang NIK
-        if len(nik) != 16 or not nik.isdigit():
-            st.error("❌ NIK harus terdiri dari 16 digit angka.")
-            return
+            submit = st.form_submit_button("Daftar")
 
-        # Cek duplikasi NIK
-        if nik in df_user['NIK'].values:
-            st.error("❌ NIK sudah terdaftar. Silakan login atau gunakan NIK lain.")
-            return
+        if submit:
+            # Validasi input
+            if not nik or not nama or not alamat or not plat or pajak <= 0:
+                st.error("❌ Harap lengkapi semua data dengan benar.")
+                return
+            
+            if len(nik) != 16 or not nik.isdigit():
+                st.error("❌ NIK harus terdiri dari 16 digit angka.")
+                return
 
-        # Cek duplikasi Plat
-        if plat in df_kendaraan['Plat'].values:
-            st.error("❌ Plat kendaraan sudah terdaftar.")
-            return
+            if nik in df_user['NIK'].values:
+                st.error("❌ NIK sudah terdaftar. Silakan login atau gunakan NIK lain.")
+                return
 
-        # Buat DataFrame baru
-        new_user = pd.DataFrame([{
-            "NIK": nik,
-            "Nama": nama
-        }])
+            if plat in df_kendaraan['Plat'].values:
+                st.error("❌ Plat kendaraan sudah terdaftar.")
+                return
 
-        new_kendaraan = pd.DataFrame([{
-            "NIK": nik,
-            "Plat": plat,
-            "Nama": nama,
-            "Alamat": alamat,
-            "Pajak_Terhutang": pajak,
-            "Tanggal_Jatuh_Tempo": tanggal_jatuh_tempo,
-            "Pajak": pajak
-        }])
+            # Simpan data
+            new_user = pd.DataFrame([{"NIK": nik, "Nama": nama}])
+            new_kendaraan = pd.DataFrame([{
+                "NIK": nik,
+                "Plat": plat,
+                "Nama": nama,
+                "Alamat": alamat,
+                "Pajak_Terhutang": pajak,
+                "Tanggal_Jatuh_Tempo": tanggal_jatuh_tempo,
+                "Pajak": pajak
+            }])
 
-        # Simpan data
-        save_data(new_user, new_kendaraan)
+            save_data(new_user, new_kendaraan)
+
+            # Tampilkan halaman sukses
+            st.session_state.registration_success = True
+            st.rerun()
+
+    # ---------------------
+    # Jika sukses daftar
+    # ---------------------
+    else:
+        st.markdown("<div style='text-align: center;'>", unsafe_allow_html=True)
         st.success("✅ Akun berhasil didaftarkan. Silakan login.")
-        st.session_state.page = "login"
-        st.session_state.form_submitted = False
-        st.rerun()
+        if st.button("🔐 Kembali ke Halaman Login", use_container_width=True):
+            st.session_state.page = "login"
+            st.session_state.registration_success = False
+            st.rerun()
+        st.markdown("</div>", unsafe_allow_html=True)
 
 # -------------------------------
 # DASHBOARD PAGE
