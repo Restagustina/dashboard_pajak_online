@@ -1,45 +1,50 @@
+import streamlit as st
 import pandas as pd
 from datetime import datetime
 import os
-import streamlit as st
-from utils import load_data, save_data 
+import base64
+from utils import load_data, save_data
 
-import base64  # karena pakai base64 di fungsi `set_background`
+# -------------------------------
+# SET BACKGROUND
+# -------------------------------
+def set_background(image_path):
+    with open(image_path, "rb") as image_file:
+        encoded = base64.b64encode(image_file.read()).decode()
+    css = f"""
+    <style>
+    .stApp {{
+        background-image: url("data:image/jpg;base64,{encoded}");
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
+    }}
 
-# --- path gambar ---
+    .stApp::before {{
+        content: "";
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        backdrop-filter: blur(4px); /* Efek blur */
+    }}
+    </style>
+    """
+    st.markdown(css, unsafe_allow_html=True)
+
+# -------------------------------
+# KONFIGURASI AWAL
+# -------------------------------
 BASE_PATH = os.path.dirname(os.path.abspath(__file__))
-image_path = os.path.join(BASE_PATH, "assets", "samsatplg1.jpg")
-
-# --- Fungsi background dengan transparansi ---
-def set_background(image_file):
-    with open(image_file, "rb") as image:
-        encoded = base64.b64encode(image.read()).decode()
-    st.markdown(
-        f"""
-        <style>
-        .stApp {{
-            background-image: url("data:image/jpg;base64,{encoded}");
-            background-size: cover;
-            background-repeat: no-repeat;
-            background-attachment: fixed;
-        }}
-        .main > div {{
-            background-color: rgba(255, 255, 255, 0.20);  /* transparansi konten */
-            padding: 2rem;
-            border-radius: 15px;
-        }}
-        </style>
-        """,
-        unsafe_allow_html=True
-    )
-
-# --- Jalankan fungsi background ---
-set_background(image_path)
+image_path = os.path.join(BASE_PATH, "assets", "bg.jpg")
+set_background(image_path)  # SET BACKGROUND di awal
 
 # -------------------------------
 # LOAD DATA
 # -------------------------------
 df_user, df_kendaraan, df_riwayat = load_data()
+data_user = pd.read_excel("DASHBOARD_main/data_user.xlsx")
 
 # -------------------------------
 # SESSION STATE
@@ -48,20 +53,52 @@ if 'page' not in st.session_state:
     st.session_state.page = 'login'
 if 'user_data' not in st.session_state:
     st.session_state.user_data = {}
+if 'form_submitted' not in st.session_state:
+    st.session_state.form_submitted = False
 
 # -------------------------------
-# HALAMAN LOGIN
+# LOGIN PAGE
 # -------------------------------
 def login_page():
-    st.markdown("<h3 style='color:blue'> SAMSAT PALEMBANG 1</h3>", unsafe_allow_html=True)
+    st.markdown("""
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Anton&display=swap');
 
-    nik = st.text_input("Masukkan NIK")
-    plat = st.text_input("Masukkan Plat Nomor")
+    .custom-title {
+        font-size: 60px;
+        font-weight: bold;
+        text-align: center;
+        text-transform: uppercase;
+        font-family: 'Anton', sans-serif;
+        background: linear-gradient(to top left, yellow, white);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        margin-bottom: 0px;
+    }
 
-    # Tombol login (pakai st.button biasa)
+    .custom-subtitle {
+        text-align: center;
+        font-size: 18px;
+        color: white;
+        margin-top: -5px;
+        margin-bottom: 30px; /* tambahkan jarak bawah sub title to input nik
+        font-family: 'Arial', sans-serif;
+        letter-spacing: 1px;
+    }
+    </style>
+
+    <div class="custom-title">
+        SIMANPA I
+    </div>
+    <div class="custom-subtitle">
+        Sistem Informasi Pembayaran Pajak Kendaraan Palembang 1
+    </div>
+    """, unsafe_allow_html=True)
+
+    input_nik = st.text_input("Masukkan NIK").strip()
+    input_plat = st.text_input("Masukkan Plat").strip().upper()
     login_clicked = st.button("Login")
 
-    # Tombol daftar (pakai HTML + st.markdown untuk warna merah)
     daftar_html = """
         <form action="" method="post">
             <input type="submit" value="Daftar Akun Baru"
@@ -74,88 +111,137 @@ def login_page():
                 font-size: 16px;
                 margin-top: 10px;
                 cursor: pointer;
-            ">
-        </form>
+            "></form>
     """
-    daftar_clicked = st.markdown(daftar_html, unsafe_allow_html=True)
+    st.markdown(daftar_html, unsafe_allow_html=True)
 
-    # Proses login
     if login_clicked:
-        user_match = df_user[df_user['NIK'] == nik]
-        kendaraan_match = df_kendaraan[df_kendaraan['Plat'] == plat]
+        user_match = data_user[data_user['NIK'] == input_nik]
+        kendaraan_match = df_kendaraan[df_kendaraan['Plat'].str.upper() == input_plat]
 
         if not user_match.empty and not kendaraan_match.empty:
             st.session_state.user_data = {
-                'NIK': nik,
-                'Plat': plat,
-                'Nama': user_match.iloc[0]['Nama'],
-                'Pajak': kendaraan_match.iloc[0]['Pajak']
+                'NIK': input_nik,
+                'Plat': input_plat,
+                'Nama': user_match.iloc[0].get('Nama', ''),
+                'Pajak': kendaraan_match.iloc[0].get('Pajak', '')
             }
             st.session_state.page = 'dashboard'
             st.rerun()
         else:
             st.error("❌ Data tidak ditemukan. Periksa kembali NIK dan Plat.")
 
-    # Tangkap klik tombol HTML dengan deteksi submit manual
-    if st.session_state.get("page") != "register" and st.session_state.get("form_submitted", False) is False:
-        if st.query_params:  # Deteksi URL berubah karena klik submit
-            st.session_state.page = "register"
-            st.session_state.form_submitted = True
-            st.rerun()
+    if st.query_params and not st.session_state.form_submitted:
+        st.session_state.page = "register"
+        st.session_state.form_submitted = True
+        st.rerun()
 
 # -------------------------------
-# HALAMAN REGISTER (opsional)
+# REGISTER PAGE
 # -------------------------------
+import streamlit as st
+import base64
+
 def register_page():
-    st.markdown("<h3 style='color:red'> Belum Punya Akun? Daftar </h3>", unsafe_allow_html=True)
+    st.set_page_config(layout="centered")
 
+    # Load background image & encode to base64
+    with open("assets/bg.jpg", "rb") as image_file:
+        encoded = base64.b64encode(image_file.read()).decode()
+
+    # CSS style sama persis seperti login
+    css = f"""
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Anton&display=swap');
+
+    .custom-title {{
+        font-size: 60px;
+        font-weight: bold;
+        text-align: center;
+        text-transform: uppercase;
+        font-family: 'Anton', sans-serif;
+        background: linear-gradient(to right, yellow, white);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        margin-bottom: 0px;
+    }}
+
+    .custom-subtitle {{
+        text-align: center;
+        font-size: 16px;
+        color: white;
+        margin-top: -10px;
+        margin-bottom: 30px;
+    }}
+
+    .stApp {{
+        background-image: url("data:image/jpg;base64,{encoded}");
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
+        backdrop-filter: blur(4px);
+    }}
+
+    .stTextInput > div > div > input {{
+        background-color: rgba(33, 33, 33, 0.9);
+        color: white;
+    }}
+
+    .stButton>button {{
+        background-color: #dc3545;
+        color: white;
+        font-weight: bold;
+        padding: 10px 24px;
+        border-radius: 8px;
+        border: none;
+        margin-top: 20px;
+    }}
+    </style>
+    """
+
+    st.markdown(css, unsafe_allow_html=True)
+
+    # Judul
+    st.markdown('<div class="custom-title">SIMANPA I</div>', unsafe_allow_html=True)
+    st.markdown('<div class="custom-subtitle">Sistem Informasi Pembayaran Pajak Kendaraan Online</div>', unsafe_allow_html=True)
+
+    # Form Registrasi
+    nama = st.text_input("Masukkan Nama Lengkap")
     nik = st.text_input("Masukkan NIK")
-    nama = st.text_input("Masukkan Nama")
     plat = st.text_input("Masukkan Plat Nomor")
-    pajak = st.number_input("Masukkan Jumlah Pajak", min_value=0)
+    password = st.text_input("Masukkan Password", type="password")
+    konfirmasi = st.text_input("Konfirmasi Password", type="password")
 
     if st.button("Daftar"):
-        if nik and nama and plat:
-            new_user = pd.DataFrame([{
-                'NIK': nik,
-                'Nama': nama
-            }])
-            new_kendaraan = pd.DataFrame([{
-                'Plat': plat,
-                'NIK': nik,
-                'Pajak': pajak
-            }])
-
-            # Simpan ke file
-            save_data(new_user, new_kendaraan)
-
+        if password != konfirmasi:
+            st.error("Password dan konfirmasi tidak sama.")
+        elif nama and nik and plat:
+            # Simpan data ke Excel (atau database)
             st.success("Pendaftaran berhasil! Silakan login.")
             st.session_state.page = "login"
             st.rerun()
         else:
-            st.error("Harap isi semua kolom.")
+            st.warning("Semua kolom harus diisi.")
 
+    # Tombol kembali
     if st.button("Kembali ke Login"):
         st.session_state.page = "login"
         st.rerun()
 
 # -------------------------------
-# HALAMAN DASHBOARD
+# DASHBOARD PAGE
 # -------------------------------
 def dashboard_page():
-    if 'user_data' not in st.session_state or not st.session_state.user_data:
+    if not st.session_state.user_data:
         st.error("Anda belum login.")
         return
 
     user = st.session_state.user_data
-    nama = user.get('Nama', 'Wajib Pajak')
-    nik = user.get('NIK', '')
-    plat = user.get('Plat', '')
+    nama, nik, plat = user.get('Nama', ''), user.get('NIK', ''), user.get('Plat', '')
 
     st.write(f"Selamat datang, {nama}")
     st.title("📋 Menu")
 
-    # Sidebar navigasi
     menu = st.sidebar.radio("Navigasi", ["Profil", "Info Pajak", "Bayar Pajak", "Riwayat Pembayaran", "Logout"])
 
     if menu == "Profil":
@@ -185,7 +271,7 @@ def dashboard_page():
         st.rerun()
 
 # -------------------------------
-# MAIN LOGIC
+# ROUTING HALAMAN
 # -------------------------------
 if st.session_state.page == 'login':
     login_page()
