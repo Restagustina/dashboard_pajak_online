@@ -44,7 +44,6 @@ set_background(image_path)  # SET BACKGROUND di awal
 # LOAD DATA
 # -------------------------------
 df_user, df_kendaraan, df_riwayat = load_data()
-data_user = pd.read_excel("DASHBOARD_main/data_user.xlsx")
 
 # -------------------------------
 # SESSION STATE
@@ -81,7 +80,7 @@ def login_page():
         font-size: 18px;
         color: white;
         margin-top: 0px;
-        margin-bottom: 30px; /* tambahkan jarak bawah sub title to input nik
+        margin-bottom: 30px; /* tambahkan jarak bawah sub title to input nik*/
         font-family: 'Arial', sans-serif;
         letter-spacing: 1px;
     }
@@ -101,44 +100,46 @@ def login_page():
     # Tombol Login biasa (biarkan default)
     login_clicked = st.button("Login", key="login_button")
 
-    # HTML Tombol Custom untuk "Daftar Akun Baru"
+    # Tombol Registrasi
     st.markdown("""
-        <style>
-        .custom-button {
-            background-color: #d32f2f;
-            color: white;
-            padding: 0.5em 1em;
-            font-size: 16px;
-            border: none;
-            border-radius: 8px;
-            font-weight: bold;
-            margin-top: 10px;
-            transition: background-color 0.3s ease;
-        }
+    <style>
+    .info-text {
+        text-align: center;
+        margin-top: 20px;
+        font-size: 15px;
+        font-family: 'Arial', sans-serif;
+    }
 
-        .custom-button:hover {
-            background-color: #b71c1c;
-            cursor: pointer;
-        }
+    .info-text span {
+        color: white;
+        margin-right: 8px;
+    }
 
-        .custom-button:active {
-            background-color: #a30000;
-            transform: scale(0.97);
-        }
-        </style>
+    .register-link {
+        color: white; /* ubah warna jadi putih */
+        background-color: transparent;
+        padding: 6px 12px;
+        border-radius: 5px;
+        font-weight: bold;
+        text-decoration: none;
+        transition: color 0.3s ease;
+    }
 
-        <form action="?daftar=true">
-            <button class="custom-button" type="submit">Daftar Akun Baru</button>
-        </form>
-    """, unsafe_allow_html=True)
+    .register-link:hover {
+        color: #ffcdd2; /* efek hover jadi merah muda */
+    }
+    </style>
 
-    if st.query_params.get("daftar") == "true":
-        st.session_state.page = "register"
-        st.rerun()
+    <div class="info-text">
+        <span>Belum Punya Akun?</span>
+        <a href="?daftar=true" class="register-link">Registrasi Now</a>
+    </div>
+""", unsafe_allow_html=True)
+
 
     # Login logic
     if login_clicked:
-        user_match = data_user[data_user['NIK'] == input_nik]
+        user_match = df_user[df_user['NIK'] == input_nik]
         kendaraan_match = df_kendaraan[df_kendaraan['Plat'].str.upper() == input_plat]
 
         if not user_match.empty and not kendaraan_match.empty:
@@ -160,6 +161,8 @@ def login_page():
 # -------------------------------
 # REGISTER PAGE
 # -------------------------------
+from datetime import date, timedelta
+
 def register_page():
     st.markdown("""
     <style>
@@ -178,29 +181,62 @@ def register_page():
     </style>
 
     <div class='judul'>Daftar Akun Baru</div>
-""", unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
 
     with st.form("register_form"):
         nik = st.text_input("Masukkan NIK").strip()
         nama = st.text_input("Masukkan Nama Lengkap").strip()
+        alamat = st.text_input("Masukkan Alamat").strip()
         plat = st.text_input("Masukkan Plat Kendaraan").strip().upper()
-        pajak = st.text_input("Masukkan Jumlah Pajak (Rp)").strip()
+        pajak = st.number_input("Masukkan Jumlah Pajak (Rp)", min_value=0)
+        default_tempo = date.today() + timedelta(days=365)
+        tanggal_jatuh_tempo = st.date_input("Masukkan Tanggal Jatuh Tempo", value=default_tempo)
 
         submit = st.form_submit_button("Daftar")
 
     if submit:
-        if nik and nama and plat and pajak:
-            # Simpan ke Excel lewat utils.py
-            new_user = pd.DataFrame([{"NIK": nik, "Nama": nama}])
-            new_kendaraan = pd.DataFrame([{"NIK": nik, "Plat": plat, "Pajak": pajak}])
+        # Validasi input wajib
+        if not nik or not nama or not alamat or not plat or pajak <= 0:
+            st.error("❌ Harap lengkapi semua data dengan benar.")
+            return
+        
+        # Validasi panjang NIK
+        if len(nik) != 16 or not nik.isdigit():
+            st.error("❌ NIK harus terdiri dari 16 digit angka.")
+            return
 
-            save_data(new_user, new_kendaraan)
-            st.success("✅ Akun berhasil didaftarkan. Silakan login.")
-            st.session_state.page = "login"
-            st.session_state.form_submitted = False
-            st.rerun()
-        else:
-            st.error("❌ Harap lengkapi semua data.")
+        # Cek duplikasi NIK
+        if nik in df_user['NIK'].values:
+            st.error("❌ NIK sudah terdaftar. Silakan login atau gunakan NIK lain.")
+            return
+
+        # Cek duplikasi Plat
+        if plat in df_kendaraan['Plat'].values:
+            st.error("❌ Plat kendaraan sudah terdaftar.")
+            return
+
+        # Buat DataFrame baru
+        new_user = pd.DataFrame([{
+            "NIK": nik,
+            "Nama": nama
+        }])
+
+        new_kendaraan = pd.DataFrame([{
+            "NIK": nik,
+            "Plat": plat,
+            "Nama": nama,
+            "Alamat": alamat,
+            "Pajak_Terhutang": pajak,
+            "Tanggal_Jatuh_Tempo": tanggal_jatuh_tempo,
+            "Pajak": pajak
+        }])
+
+        # Simpan data
+        save_data(new_user, new_kendaraan)
+        st.success("✅ Akun berhasil didaftarkan. Silakan login.")
+        st.session_state.page = "login"
+        st.session_state.form_submitted = False
+        st.rerun()
 
 # -------------------------------
 # DASHBOARD PAGE
