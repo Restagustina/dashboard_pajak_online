@@ -16,6 +16,9 @@ if 'form_submitted' not in st.session_state:
     st.session_state.form_submitted = False
 if 'registration_success' not in st.session_state:
     st.session_state.registration_success = False
+if 'login' not in st.session_state:
+    st.session_state.login = False
+
 
 # -------------------------------
 # DETEKSI ?daftar=true
