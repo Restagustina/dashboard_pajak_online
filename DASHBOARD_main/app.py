@@ -32,30 +32,55 @@ if query_params.get("daftar", [""])[0].lower() == "true":
 # -------------------------------
 # SET BACKGROUND
 # -------------------------------
-def set_background(image_path):
-    with open(image_path, "rb") as image_file:
-        encoded = base64.b64encode(image_file.read()).decode()
-    css = f"""
-    <style>
-    .stApp {{
-        background-image: url("data:image/jpg;base64,{encoded}");
-        background-size: cover;
-        background-position: center;
-        background-repeat: no-repeat;
-    }}
-
-    .stApp::before {{
-        content: "";
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        backdrop-filter: blur(7px); /* Efek blur */
-    }}
-    </style>
-    """
-    st.markdown(css, unsafe_allow_html=True)
+def set_background(image_path=None, color=None):
+    css = ""
+    
+    # Jika menggunakan gambar
+    if image_path:
+        if not os.path.exists(image_path):
+            st.warning("Gambar background tidak ditemukan.")
+            return
+        with open(image_path, "rb") as image_file:
+            encoded = base64.b64encode(image_file.read()).decode()
+        css = f"""
+        <style>
+        .stApp {{
+            background-image: url("data:image/jpg;base64,{encoded}");
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+        }}
+        .stApp::before {{
+            content: "";
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            backdrop-filter: blur(7px);
+        }}
+        </style>
+        """
+    
+    # Jika menggunakan warna saja (untuk dashboard)
+    elif color:
+        css = f"""
+        <style>
+        .stApp {{
+            background-color: {color};
+            background-image: none;
+        }}
+        .block-container {{
+            background-color: rgba(255, 255, 255, 0.95);
+            border-radius: 12px;
+            padding: 2rem;
+            backdrop-filter: blur(4px);
+        }}
+        </style>
+        """
+    
+    if css:
+        st.markdown(css, unsafe_allow_html=True)
 
 # -------------------------------
 # KONFIGURASI AWAL
@@ -73,6 +98,7 @@ df_user, df_kendaraan, df_riwayat = load_data()
 # LOGIN PAGE
 # -------------------------------
 def login_page():
+    set_background("DASHBOARD_main/assets/bg.jpg") #background
     if st.session_state.get("registration_success", False):
         st.success("✅ Akun berhasil didaftarkan. Silakan login.")
         st.session_state.registration_success = False  # reset di sini setelah ditampilkan
@@ -190,6 +216,7 @@ def login_page():
 # REGISTER PAGE
 # -------------------------------
 def register_page():
+    set_background("DASHBOARD_main/assets/bg.jpg")
     st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap');
@@ -281,39 +308,146 @@ def dashboard_page():
         st.error("Anda belum login.")
         return
 
+    # Background putih
+    set_background(color="#f3e9e9dc")
+
+    # Styling
+    st.markdown("""
+    <style>
+    /* Warna teks utama jadi hitam */
+    .stApp, .block-container, .stMarkdown, .stText, .stTitle, .stHeader, .stSubheader {
+        color: #000000 !important;
+    }
+
+    /* Sidebar gradasi */
+    [data-testid="stSidebar"] {
+        background: linear-gradient(to bottom, #1976d2, #26a69a);
+        color: white;
+    }
+
+    /* Sidebar hover effect */
+    [data-testid="stSidebar"] ul {
+        padding-left: 0;
+    }
+
+    [data-testid="stSidebar"] li:hover {
+        background-color: rgba(255,255,255,0.1);
+        border-radius: 8px;
+        padding-left: 8px;
+        font-weight: bold;
+        transition: 0.3s ease;
+        cursor: pointer;
+    }
+
+    /* Konten utama */
+    .main .block-container {
+        background-color: #ffffff !important;
+        padding: 2rem 3rem;
+        border-radius: 16px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        margin-top: 2rem;
+        margin-bottom: 2rem;
+    }
+
+    /* Chip status */
+    .chip {
+        display: inline-block;
+        padding: 4px 10px;
+        margin-left: 10px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 600;
+        color: white;
+    }
+    .chip.aktif {
+        background-color: #4caf50;
+    }
+    .chip.menunggu {
+        background-color: #ffc107;
+        color: #000;
+    }
+    .chip.jatuh-tempo {
+        background-color: #2196f3;
+    }
+
+    h1, h2 {
+        margin-bottom: 1rem;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+    # Ambil data user dari session
     user = st.session_state.user_data
     nama, nik, plat = user.get('Nama', ''), user.get('NIK', ''), user.get('Plat', '')
 
-    st.write(f"Selamat datang, {nama}")
-    st.title("📋 Menu")
+    # Header
+    st.markdown(f"<h3 style='text-align: center;'>Selamat datang, {nama}</h3>", unsafe_allow_html=True)
+    st.title("Dashboard SIMANPA I") 
 
-    menu = st.sidebar.radio("Navigasi", ["Profil", "Info Pajak", "Bayar Pajak", "Riwayat Pembayaran", "Logout"])
+    # Sidebar navigasi
+    st.sidebar.markdown("## 🧭 Menu Navigasi")
+    menu = st.sidebar.radio("Pilih Halaman", [
+        "👤 Profil", 
+        "📊 Info Pajak",  
+        "💰 Bayar Pajak",  
+        "📜 Riwayat Pembayaran",  
+        "🔚 Logout" 
+    ])
 
-    if menu == "Profil":
-        st.subheader("👤 Profil Wajib Pajak")
-        st.write(f"**NIK:** {nik}")
-        st.write(f"**Nama:** {nama}")
-        st.write(f"**Plat Nomor:** {plat}")
+    # Halaman Profil
+    if menu == "👤 Profil":
+        with st.container():
+            st.subheader("👤 Profil Wajib Pajak")
+            st.write(f"**NIK:** `{nik}`")
+            st.write(f"**Nama:** `{nama}`")
+            st.write(f"**Plat Nomor:** `{plat}`")
 
-    elif menu == "Info Pajak":
-        st.subheader("ℹ️ Info Pajak")
-        st.write("Halaman ini akan menampilkan informasi pajak (nanti bisa diisi data PKB/SWDKLLJ dsb).")
+    # Halaman Info Pajak
+    elif menu == "📊 Info Pajak": 
+        st.markdown("""
+        ## 📊 Info Pajak 
 
-    elif menu == "Bayar Pajak":
-        st.subheader("💸 Simulasi Pembayaran Pajak")
+        Halaman ini akan menampilkan informasi terkait:
+
+        - Pajak Kendaraan Bermotor (PKB) <span class="chip aktif">Aktif</span>  
+        - SWDKLLJ <span class="chip menunggu">Menunggu</span>  
+        - Jatuh Tempo <span class="chip jatuh-tempo">10 hari lagi</span>  
+
+        <br><em>(Masih dalam pengembangan).</em>
+        """, unsafe_allow_html=True)
+
+    # Halaman Bayar Pajak
+    elif menu == "💰 Bayar Pajak": 
+        st.subheader("💰 Simulasi Pembayaran Pajak") 
+        jumlah = st.number_input("Masukkan Jumlah Pembayaran", min_value=0, step=10000)
         metode = st.selectbox("Pilih Metode Pembayaran", ["BRI", "Mandiri", "DANA", "OVO", "GoPay"])
         if st.button("Bayar Sekarang"):
-            st.success(f"Pembayaran via {metode} berhasil (simulasi).")
+            waktu = pd.Timestamp.now().strftime("%d-%m-%Y %H:%M")
+            st.success(f"✅ Pembayaran sebesar Rp{jumlah:,} via {metode} berhasil pada {waktu} (simulasi).")
 
-    elif menu == "Riwayat Pembayaran":
-        st.subheader("🧾 Riwayat Pembayaran")
-        st.write("Belum ada riwayat pembayaran (simulasi data).")
+    # Halaman Riwayat Pembayaran
+    elif menu == "📜 Riwayat Pembayaran": 
+        st.subheader("📜 Riwayat Pembayaran") 
+        try:
+            df_riwayat = pd.read_excel("DASHBOARD_main/riwayat_pembayaran.xlsx")
+            df_user = df_riwayat[df_riwayat["NIK"] == nik]
+            if not df_user.empty:
+                st.dataframe(df_user)
+            else:
+                st.info("Belum ada riwayat pembayaran.")
+        except Exception as e:
+            st.error(f"Gagal membaca data riwayat: {e}")
 
-    elif menu == "Logout":
+    # Logout
+    elif menu == "🔚 Log out": 
         st.session_state.user_data = {}
         st.session_state.page = 'login'
         st.success("Logout berhasil.")
         st.rerun()
+
+    # Footer
+    st.markdown("<hr>", unsafe_allow_html=True)
+    st.markdown("<center><small>© 2025 e-Pajak Samsat Palembang I</small></center>", unsafe_allow_html=True)
 
 # -------------------------------
 # ROUTING HALAMAN
