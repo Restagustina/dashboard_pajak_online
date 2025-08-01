@@ -6,6 +6,7 @@ import base64
 from utils import load_data, save_data, update_status_lunas
 import openpyxl
 from streamlit.components.v1 import html
+from st_aggrid import AgGrid, GridOptionsBuilder
 
 # -------------------------------
 # SESSION STATE & QUERY PARAM DETECTION
@@ -419,7 +420,7 @@ def dashboard_page():
     st.sidebar.markdown("## 🧭 Menu Navigasi")
     menu = st.sidebar.radio("Pilih Halaman", [
         "👤 Profil", 
-        "📊 Info Pajak",  
+        "📊 Statistik Saya",  
         "💳 Bayar Pajak",  
         "📜 Riwayat Pembayaran",  
         "🔚 Logout" 
@@ -430,7 +431,7 @@ def dashboard_page():
         st.markdown("""
         <style>
         .stApp {
-            background-color: #ffffff;  /* putih */
+            background-color: lightgray; 
         }
         </style>
         """, unsafe_allow_html=True)
@@ -475,66 +476,94 @@ def dashboard_page():
         """, height=500)
 
 
-    # Halaman Info Pajak
-    elif menu == "📊 Info Pajak": 
+    # Halaman Statistik Pajak User
+    elif menu == "📊 Statistik Saya":
         st.markdown("""
         <style>
         .stApp {
-            background-color: #ffffff;  /* putih */
+            background-color: lightgray; 
         }
         </style>
         """, unsafe_allow_html=True)
+         
+        st.subheader("📊 Statistik Pajak Pribadi Anda")
 
-        html("""
-            <style>
-            .profil-box {
-                background-color: #eeeeee;
-                border: 1px solid #ccc;
-                border-radius: 10px;
-                padding: 20px;
-                max-width: 600px;
-                margin: auto;
-                box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-                font-family: 'Arial', sans-serif;
-            }
-            .chip {
-                display: inline-block;
-                padding: 0.25rem 0.75rem;
-                border-radius: 999px;
-                font-size: 0.85rem;
-                font-weight: bold;
-                color: white;
-                margin-left: 8px;
-            }
-            .chip.aktif {
-                background-color: #4CAF50;
-            }
-            .chip.menunggu {
-                background-color: #FFC107;
-                color: black;
-            }
-            .chip.jatuh-tempo {
-                background-color: #F44336;
-            }
-            </style>
+        # Ambil NIK user yang sedang login
+        nik_login = st.session_state.get("nik")
 
-            <div class="profil-box">
-                <h4 style="text-align:center;">📊 Info Pajak</h4>
-                <ul>
-                    <li>Pajak Kendaraan Bermotor (PKB) <span class="chip aktif">Aktif</span></li>
-                    <li>SWDKLLJ <span class="chip menunggu">Menunggu</span></li>
-                    <li>Jatuh Tempo <span class="chip jatuh-tempo">10 hari lagi</span></li>
-                </ul>
-                <em>(Masih dalam pengembangan).</em>
-            </div>
-""", height=350)
+        # Filter riwayat berdasarkan NIK
+        _, _, df_riwayat = load_data()
+        df_user = df_riwayat[df_riwayat["NIK"] == nik]
+
+        if df_user.empty:
+            st.markdown(
+                """
+                <div style='
+                    background-color: #fff3cd;
+                    padding: 12px;
+                    border-radius: 5px;
+                    border-left: 6px solid #ffecb5;
+                    color: #555;
+                '>
+                    ⚠️ Belum ada data pembayaran.
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+        else:
+            # Konversi tanggal
+            df_user["Tanggal_Bayar"] = pd.to_datetime(df_user["Tanggal_Bayar"], errors="coerce")
+
+            # Total bayar
+            total_bayar = df_user["Jumlah"].astype(float).sum()
+            total_transaksi = df_user.shape[0]
+
+            # Metode favorit
+            metode_fav = df_user["Metode"].mode()[0] if not df_user["Metode"].mode().empty else "-"
+
+            # Bulan paling sering bayar
+            bulan_fav = df_user["Tanggal_Bayar"].dt.month_name().value_counts().idxmax()
+
+            # Card Ringkasan
+            st.markdown("""
+                <style>
+                .info-card {
+                    background-color: #e7f3fe;
+                    padding: 15px;
+                    border-left: 6px solid #2196F3;
+                    border-radius: 6px;
+                    margin-bottom: 15px;
+                    color: #004085;
+                    font-size: 16px;
+                }
+                </style>
+            """, unsafe_allow_html=True)
+
+            st.markdown(f"""
+                <div class='info-card'>
+                    💰 <strong>Total Bayar:</strong> Rp {total_bayar:,.0f}
+                </div>
+                <div class='info-card'>
+                    🧾 <strong>Jumlah Transaksi:</strong> {total_transaksi}
+                </div>
+                <div class='info-card'>
+                    📱 <strong>Metode Favorit:</strong> {metode_fav}
+                </div>
+            """, unsafe_allow_html=True)
+
+            # Grafik bulanan
+            df_user["Bulan"] = df_user["Tanggal_Bayar"].dt.strftime('%B')
+            bayar_per_bulan = df_user.groupby("Bulan")["Jumlah"].sum().reset_index()
+
+            st.bar_chart(bayar_per_bulan.rename(columns={"Jumlah": "Total Pembayaran"}).set_index("Bulan"))
 
     # Halaman Bayar Pajak
     elif menu == "💳 Bayar Pajak": 
         st.markdown("""
         <style>
         .stApp {
-            background-color: #ffffff;
+            background-color: lightgray;
         }
         .judul-bayar {
             font-size: 14,5px;
@@ -598,7 +627,6 @@ def dashboard_page():
                     df_riwayat = pd.concat([df_riwayat, new_row], ignore_index=True)
                     df_riwayat.to_excel("DASHBOARD_main/riwayat_pembayaran.xlsx", index=False)
 
-                    # ✅ Tambahkan baris ini
                     update_status_lunas(nik, plat)
 
                     # Clear cache sebelum membaca ulang
@@ -620,7 +648,7 @@ def dashboard_page():
             st.markdown("""
             <style>
             .stApp {
-                background-color: #ffffff; 
+                background-color: lightgray; 
             }
             </style>
             """, unsafe_allow_html=True)
@@ -644,7 +672,23 @@ def dashboard_page():
                     ✅ Riwayat pembayaran ditemukan.
                     </div>
                     """, unsafe_allow_html=True)
-                    st.dataframe(df_user)
+
+                    gb = GridOptionsBuilder.from_dataframe(df_user)
+
+                    # Auto width untuk semua kolom
+                    gb.configure_default_column(autoWidth=True)
+
+                    # Opsional: pagination + layout
+                    gb.configure_grid_options(domLayout='normal')
+                    gb.configure_pagination(paginationAutoPageSize=True)
+
+                    # Tampilkan
+                    AgGrid(
+                        df_user,
+                        gridOptions=gb.build(),
+                        theme="balham",
+                        fit_columns_on_grid_load=False
+                    )
 
                 else:
                     st.markdown("""

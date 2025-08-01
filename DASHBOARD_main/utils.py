@@ -45,7 +45,6 @@ def load_data():
 
     return df_user, df_kendaraan, df_riwayat
 
-
 def save_data(new_user, new_kendaraan):
     """
     Simpan data user dan kendaraan baru ke file Excel.
