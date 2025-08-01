@@ -65,10 +65,11 @@ def save_data(new_user, new_kendaraan):
     df_user.to_excel(PATH_USER, index=False)
     df_kendaraan.to_excel(PATH_KENDARAAN, index=False)
 
-    # Buat riwayat pembayaran jika belum ada
+    # Buat riwayat pembayaran
     if not os.path.exists(PATH_RIWAYAT):
         df_riwayat = pd.DataFrame(columns=[
-            "NIK", "Plat", "Nama", "Tanggal_Bayar", "Jumlah", "Metode"
+            "NIK", "Plat", "Nama", "Tanggal_Bayar", "Jumlah", "Metode",
+            "Nama_Penerima", "No_HP", "Alamat", "Jasa_Pengiriman"
         ])
         df_riwayat.to_excel(PATH_RIWAYAT, index=False)
 

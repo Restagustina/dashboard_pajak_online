@@ -566,7 +566,7 @@ def dashboard_page():
             background-color: lightgray;
         }
         .judul-bayar {
-            font-size: 14,5px;
+            font-size: 14.5px;
             color: #555555;
             text-align: left;
             margin-top: 40px;
@@ -583,7 +583,18 @@ def dashboard_page():
         st.markdown('<div class="judul-bayar">Silakan selesaikan pembayaran pajak kendaraan Anda di bawah ini.</div>', unsafe_allow_html=True)
 
         jumlah = st.number_input("Masukkan Jumlah Pembayaran", min_value=0, step=10000)
-        metode = st.selectbox("Pilih Metode Pembayaran", ["Bank Rakyat Indonesia (BRI)", "Bank Mandiri", "Bank Negara Indonesia (BNI)", "Bank Tabungan Negara (BTN)", "OBank Central Asia (BCA)", "Bank Syariah Indonesia (BSI)", "GoPay", "SeaBank"])
+        metode = st.selectbox("Pilih Metode Pembayaran", ["Bank Rakyat Indonesia (BRI)", "Bank Mandiri", "Bank Negara Indonesia (BNI)", "Bank Tabungan Negara (BTN)", "Bank Central Asia (BCA)", "Bank Syariah Indonesia (BSI)", "GoPay", "SeaBank"])
+
+        # === Input Data Pengiriman Dokumen ===
+        st.markdown('<div class="judul-bayar">📦 Lengkapi Data Pengiriman Dokumen</div>', unsafe_allow_html=True)
+
+        col1, col2 = st.columns(2)
+        with col1:
+            nama_penerima = st.text_input("Nama Penerima Dokumen")
+            no_hp = st.text_input("No. HP Penerima")
+        with col2:
+            jasa = st.selectbox("Jasa Pengiriman", ["JNE", "J&T", "Pos Indonesia", "SiCepat", "GO-SEND"])
+        alamat = st.text_area("Alamat Lengkap Tujuan")
 
         # Styling tombol Bayar Sekarang
         st.markdown("""
@@ -605,43 +616,62 @@ def dashboard_page():
         """, unsafe_allow_html=True)
 
         if st.button("Bayar Sekarang"):
-            try:
-                waktu = pd.Timestamp.now().strftime("%d-%m-%Y %H:%M")
+            if not nama_penerima or not no_hp or not alamat or not jasa:
+                st.warning("⚠️ Harap lengkapi semua data pengiriman dokumen sebelum membayar.")
+            else:
+                try:
+                    waktu = pd.Timestamp.now().strftime("%d-%m-%Y %H:%M")
 
-                df_user, df_kendaraan, df_riwayat = load_data()
-                data_user = df_kendaraan[df_kendaraan["NIK"] == nik]
+                    df_user, df_kendaraan, df_riwayat = load_data()
+                    data_user = df_kendaraan[df_kendaraan["NIK"] == nik]
 
-                if not data_user.empty:
-                    nama = data_user.iloc[0]["Nama"]
-                    plat = data_user.iloc[0]["Plat"]
+                    if not data_user.empty:
+                        nama = data_user.iloc[0]["Nama"]
+                        plat = data_user.iloc[0]["Plat"]
 
-                    new_row = pd.DataFrame([{
-                        "NIK": str(nik),
-                        "Plat": plat,
-                        "Nama": nama,
-                        "Tanggal_Bayar": waktu,
-                        "Jumlah": jumlah,
-                        "Metode": metode
-                    }])
+                        new_row = pd.DataFrame([{
+                            "NIK": str(nik),
+                            "Plat": plat,
+                            "Nama": nama,
+                            "Tanggal_Bayar": waktu,
+                            "Jumlah": jumlah,
+                            "Metode": metode,
+                            "Nama_Penerima": nama_penerima,
+                            "No_HP": no_hp,
+                            "Alamat": alamat,
+                            "Jasa_Pengiriman": jasa
+                            }])
 
-                    df_riwayat = pd.concat([df_riwayat, new_row], ignore_index=True)
-                    df_riwayat.to_excel("DASHBOARD_main/riwayat_pembayaran.xlsx", index=False)
+                        df_riwayat = pd.concat([df_riwayat, new_row], ignore_index=True)
+                        df_riwayat.to_excel("DASHBOARD_main/riwayat_pembayaran.xlsx", index=False)
 
-                    update_status_lunas(nik, plat)
+                        update_status_lunas(nik, plat)
 
-                    # Clear cache sebelum membaca ulang
-                    st.cache_data.clear()
+                        # Clear cache sebelum membaca ulang
+                        st.cache_data.clear()
 
-                    # Reload dan tampilkan data terbaru
-                    _, _, df_riwayat = load_data()
-                    st.success(f"✅ Pembayaran sebesar Rp{jumlah:,} via {metode} berhasil pada {waktu}.")
-                    st.write("🔍 Data terbaru di file:")
-                    st.dataframe(df_riwayat)
-                else:
-                    st.warning("⚠️ Data kendaraan tidak ditemukan.")
-            except Exception as e:
-                st.error(f"Terjadi kesalahan saat menyimpan pembayaran: {e}")   
-
+                        # Reload dan tampilkan data terbaru
+                        _, _, df_riwayat = load_data()
+                        st.markdown(
+                            f"""
+                            <div style="
+                                background-color: #d4edda;
+                                padding: 10px;
+                                border-left: 6px solid #28a745;
+                                border-radius: 5px;
+                            ">
+                                <span style="color:#155724; font-weight:bold;">
+                                    ✅ Pembayaran sebesar Rp{jumlah:,} via {metode} berhasil pada {waktu}.
+                                </span>
+                            </div>
+                            """,
+                            unsafe_allow_html=True
+                        )
+                        
+                    else:
+                        st.warning("⚠️ Data kendaraan tidak ditemukan.")
+                except Exception as e:
+                    st.error(f"Terjadi kesalahan saat menyimpan pembayaran: {e}")   
 
     # Halaman Riwayat Pembayaran
     elif menu == "📜 Riwayat Pembayaran": 
