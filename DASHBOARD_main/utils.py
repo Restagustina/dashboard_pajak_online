@@ -75,3 +75,23 @@ def save_data(new_user, new_kendaraan):
 
     # Hapus cache agar bisa dibaca ulang
     st.cache_data.clear()
+
+
+def update_status_lunas(nik, plat):
+    """
+    Update status kendaraan menjadi 'LUNAS' setelah pembayaran.
+    """
+    if not os.path.exists(PATH_KENDARAAN):
+         return
+
+    df_kendaraan = pd.read_excel(PATH_KENDARAAN, dtype=str).fillna("").applymap(str.strip)
+
+    # Tambahkan kolom 'Status' jika belum ada
+    if 'Status' not in df_kendaraan.columns:
+        df_kendaraan['Status'] = ''
+
+    mask = (df_kendaraan['NIK'] == nik) & (df_kendaraan['Plat'] == plat)
+    df_kendaraan.loc[mask, 'Status'] = 'LUNAS'
+
+    df_kendaraan.to_excel(PATH_KENDARAAN, index=False)
+    st.cache_data.clear()

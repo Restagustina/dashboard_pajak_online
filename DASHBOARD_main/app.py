@@ -3,7 +3,9 @@ import pandas as pd
 from datetime import date, timedelta
 import os
 import base64
-from utils import load_data, save_data
+from utils import load_data, save_data, update_status_lunas
+import openpyxl
+from streamlit.components.v1 import html
 
 # -------------------------------
 # SESSION STATE & QUERY PARAM DETECTION
@@ -87,7 +89,6 @@ def set_background(image_path=None, color=None):
 # -------------------------------
 BASE_PATH = os.path.dirname(os.path.abspath(__file__))
 image_path = os.path.join(BASE_PATH, "assets", "bg.jpg")
-set_background(image_path)  # SET BACKGROUND di awal
 
 # -------------------------------
 # LOAD DATA
@@ -145,7 +146,6 @@ def login_page():
     login_clicked = st.button("Login", key="login_button")
 
     # Tombol Registrasi
-    # Tombol Registrasi
     st.markdown("""
     <style>
     .info-text {
@@ -197,6 +197,7 @@ def login_page():
                 'NIK': input_nik,
                 'Plat': input_plat,
                 'Nama': user_match.iloc[0].get('Nama', ''),
+                'Alamat': kendaraan_match.iloc[0].get('Alamat', ''),
                 'Pajak': kendaraan_match.iloc[0].get('Pajak', '')
             }
             st.session_state.page = 'dashboard'
@@ -308,9 +309,6 @@ def dashboard_page():
         st.error("Anda belum login.")
         return
 
-    # Background putih
-    set_background(color="#f3e9e9dc")
-
     # Styling
     st.markdown("""
     <style>
@@ -378,76 +376,304 @@ def dashboard_page():
 
     # Ambil data user dari session
     user = st.session_state.user_data
-    nama, nik, plat = user.get('Nama', ''), user.get('NIK', ''), user.get('Plat', '')
+    nama, nik, plat, alamat = user.get('Nama', ''), user.get('NIK', ''), user.get('Plat', ''), user.get('Alamat', '')
 
     # Header
-    st.markdown(f"<h3 style='text-align: center;'>Selamat datang, {nama}</h3>", unsafe_allow_html=True)
-    st.title("Dashboard SIMANPA I") 
+    st.markdown("""
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Anton&display=swap');
+
+    /* Hilangkan padding atas bawaan Streamlit */
+    div.block-container {
+        padding-top: 0rem;
+    }
+
+    /* Logo SIMANPA I */
+    .simanpa-logo {
+        font-family: 'Anton', sans-serif;
+        font-size: 96px;
+        font-weight: bold;
+        background: linear-gradient(to top left, #6B8E23, #C0FF00);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        text-align: center;
+        margin: -50;
+        padding-top: 30px;
+    }
+
+    /* Subtitle */
+    .simanpa-subtitle {
+        font-size: 14px;
+        text-align: center;
+        margin-top:-35px;
+        color: #555;
+        font-family: Arial, sans-serif;
+    }
+    </style>
+
+    <div class="simanpa-logo">SIMANPA I</div>
+    <div class="simanpa-subtitle">Sistem Informasi Pembayaran Pajak Kendaraan Palembang I</div>
+    """, unsafe_allow_html=True)
 
     # Sidebar navigasi
     st.sidebar.markdown("## 🧭 Menu Navigasi")
     menu = st.sidebar.radio("Pilih Halaman", [
         "👤 Profil", 
         "📊 Info Pajak",  
-        "💰 Bayar Pajak",  
+        "💳 Bayar Pajak",  
         "📜 Riwayat Pembayaran",  
         "🔚 Logout" 
     ])
 
     # Halaman Profil
     if menu == "👤 Profil":
-        with st.container():
-            st.subheader("👤 Profil Wajib Pajak")
-            st.write(f"**NIK:** `{nik}`")
-            st.write(f"**Nama:** `{nama}`")
-            st.write(f"**Plat Nomor:** `{plat}`")
+        st.markdown("""
+        <style>
+        .stApp {
+            background-color: #ffffff;  /* putih */
+        }
+        </style>
+        """, unsafe_allow_html=True)
+
+        html(f"""
+            <style>
+            .profil-box {{
+                background-color: #eeeeee;
+                border: 1px solid #ccc;
+                border-radius: 5px;
+                padding: 2px;
+                padding-left: 50px;
+                padding-bottom: 50px;
+                max-width: 600px;
+                margin: auto;
+                box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+                font-family: 'Arial', sans-serif;
+            }}
+            .profil-table {{
+                width: 100%;
+                border-collapse: collapse;
+            }}
+            .profil-table td {{
+                padding: 8px 5px;
+                vertical-align: top;
+                font-size: 16px;
+            }}
+            .profil-table td.label {{
+                font-weight: bold;
+                width: 150px;
+            }}
+            </style>
+            <div class="profil-box">
+                <h4 style="text-align:center;">Data Profil</h4>
+                <table class="profil-table">
+                    <tr><td class="label">NIK</td><td>: {nik}</td></tr>
+                    <tr><td class="label">Nama</td><td>: {nama}</td></tr>
+                    <tr><td class="label">Plat Nomor</td><td>: {plat}</td></tr>
+                    <tr><td class="label">Alamat</td><td>: {alamat}</td></tr>
+                </table>
+            </div>
+        """, height=500)
+
 
     # Halaman Info Pajak
     elif menu == "📊 Info Pajak": 
         st.markdown("""
-        ## 📊 Info Pajak 
-
-        Halaman ini akan menampilkan informasi terkait:
-
-        - Pajak Kendaraan Bermotor (PKB) <span class="chip aktif">Aktif</span>  
-        - SWDKLLJ <span class="chip menunggu">Menunggu</span>  
-        - Jatuh Tempo <span class="chip jatuh-tempo">10 hari lagi</span>  
-
-        <br><em>(Masih dalam pengembangan).</em>
+        <style>
+        .stApp {
+            background-color: #ffffff;  /* putih */
+        }
+        </style>
         """, unsafe_allow_html=True)
 
+        html("""
+            <style>
+            .profil-box {
+                background-color: #eeeeee;
+                border: 1px solid #ccc;
+                border-radius: 10px;
+                padding: 20px;
+                max-width: 600px;
+                margin: auto;
+                box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+                font-family: 'Arial', sans-serif;
+            }
+            .chip {
+                display: inline-block;
+                padding: 0.25rem 0.75rem;
+                border-radius: 999px;
+                font-size: 0.85rem;
+                font-weight: bold;
+                color: white;
+                margin-left: 8px;
+            }
+            .chip.aktif {
+                background-color: #4CAF50;
+            }
+            .chip.menunggu {
+                background-color: #FFC107;
+                color: black;
+            }
+            .chip.jatuh-tempo {
+                background-color: #F44336;
+            }
+            </style>
+
+            <div class="profil-box">
+                <h4 style="text-align:center;">📊 Info Pajak</h4>
+                <ul>
+                    <li>Pajak Kendaraan Bermotor (PKB) <span class="chip aktif">Aktif</span></li>
+                    <li>SWDKLLJ <span class="chip menunggu">Menunggu</span></li>
+                    <li>Jatuh Tempo <span class="chip jatuh-tempo">10 hari lagi</span></li>
+                </ul>
+                <em>(Masih dalam pengembangan).</em>
+            </div>
+""", height=350)
+
     # Halaman Bayar Pajak
-    elif menu == "💰 Bayar Pajak": 
-        st.subheader("💰 Simulasi Pembayaran Pajak") 
+    elif menu == "💳 Bayar Pajak": 
+        st.markdown("""
+        <style>
+        .stApp {
+            background-color: #ffffff;
+        }
+        .judul-bayar {
+            font-size: 14,5px;
+            color: #555555;
+            text-align: left;
+            margin-top: 40px;
+            margin-bottom: 5px;
+            font-family: 'Arial', sans-serif;
+        }
+        label[data-testid="stWidgetLabel"] {
+            color: black !important;
+            font-weight: 600;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+
+        st.markdown('<div class="judul-bayar">Silakan selesaikan pembayaran pajak kendaraan Anda di bawah ini.</div>', unsafe_allow_html=True)
+
         jumlah = st.number_input("Masukkan Jumlah Pembayaran", min_value=0, step=10000)
-        metode = st.selectbox("Pilih Metode Pembayaran", ["BRI", "Mandiri", "DANA", "OVO", "GoPay"])
+        metode = st.selectbox("Pilih Metode Pembayaran", ["Bank Rakyat Indonesia (BRI)", "Bank Mandiri", "Bank Negara Indonesia (BNI)", "Bank Tabungan Negara (BTN)", "OBank Central Asia (BCA)", "Bank Syariah Indonesia (BSI)", "GoPay", "SeaBank"])
+
+        # Styling tombol Bayar Sekarang
+        st.markdown("""
+            <style>
+            div.stButton > button:first-child {
+                background-color: #444444;
+                color: red;        
+                font-weight: bold;
+                border-radius: 5px;
+                padding: 0.5em 1em;
+                border: none;
+            }
+
+            div.stButton > button:first-child:hover {
+                background-color: #666666; 
+                color: white;
+            }
+            </style>
+        """, unsafe_allow_html=True)
+
         if st.button("Bayar Sekarang"):
-            waktu = pd.Timestamp.now().strftime("%d-%m-%Y %H:%M")
-            st.success(f"✅ Pembayaran sebesar Rp{jumlah:,} via {metode} berhasil pada {waktu} (simulasi).")
+            try:
+                waktu = pd.Timestamp.now().strftime("%d-%m-%Y %H:%M")
+
+                df_user, df_kendaraan, df_riwayat = load_data()
+                data_user = df_kendaraan[df_kendaraan["NIK"] == nik]
+
+                if not data_user.empty:
+                    nama = data_user.iloc[0]["Nama"]
+                    plat = data_user.iloc[0]["Plat"]
+
+                    new_row = pd.DataFrame([{
+                        "NIK": str(nik),
+                        "Plat": plat,
+                        "Nama": nama,
+                        "Tanggal_Bayar": waktu,
+                        "Jumlah": jumlah,
+                        "Metode": metode
+                    }])
+
+                    df_riwayat = pd.concat([df_riwayat, new_row], ignore_index=True)
+                    df_riwayat.to_excel("DASHBOARD_main/riwayat_pembayaran.xlsx", index=False)
+
+                    # ✅ Tambahkan baris ini
+                    update_status_lunas(nik, plat)
+
+                    # Clear cache sebelum membaca ulang
+                    st.cache_data.clear()
+
+                    # Reload dan tampilkan data terbaru
+                    _, _, df_riwayat = load_data()
+                    st.success(f"✅ Pembayaran sebesar Rp{jumlah:,} via {metode} berhasil pada {waktu}.")
+                    st.write("🔍 Data terbaru di file:")
+                    st.dataframe(df_riwayat)
+                else:
+                    st.warning("⚠️ Data kendaraan tidak ditemukan.")
+            except Exception as e:
+                st.error(f"Terjadi kesalahan saat menyimpan pembayaran: {e}")   
+
 
     # Halaman Riwayat Pembayaran
     elif menu == "📜 Riwayat Pembayaran": 
-        st.subheader("📜 Riwayat Pembayaran") 
-        try:
-            df_riwayat = pd.read_excel("DASHBOARD_main/riwayat_pembayaran.xlsx")
-            df_user = df_riwayat[df_riwayat["NIK"] == nik]
-            if not df_user.empty:
-                st.dataframe(df_user)
-            else:
-                st.info("Belum ada riwayat pembayaran.")
-        except Exception as e:
-            st.error(f"Gagal membaca data riwayat: {e}")
+            st.markdown("""
+            <style>
+            .stApp {
+                background-color: #ffffff; 
+            }
+            </style>
+            """, unsafe_allow_html=True)
+
+            st.subheader("📜 Riwayat Pembayaran") 
+            try:
+                df_riwayat = pd.read_excel("DASHBOARD_main/riwayat_pembayaran.xlsx", dtype={"NIK": str})
+                df_user = df_riwayat[df_riwayat["NIK"] == nik]
+
+                if not df_user.empty:
+                    st.markdown("""
+                    <div style="
+                        background-color: #d4edda;
+                        padding: 1em;
+                        border-radius: 5px;
+                        color: #155724;
+                        border-left: 5px solid #28a745;
+                        font-weight: 500;
+                        margin-bottom: 1em;
+                    ">
+                    ✅ Riwayat pembayaran ditemukan.
+                    </div>
+                    """, unsafe_allow_html=True)
+                    st.dataframe(df_user)
+
+                else:
+                    st.markdown("""
+                    <div style="
+                        background-color: #fff3cd;
+                        padding: 1em;
+                        border-radius: 5px;
+                        color: #856404;
+                        border-left: 5px solid #ffc107;
+                        font-weight: 500;
+                    ">
+                    ⚠️ Belum ada riwayat pembayaran.
+                    </div>
+                    """, unsafe_allow_html=True)
+
+            except Exception as e:
+                st.error(f"Gagal membaca data riwayat: {e}")
 
     # Logout
     elif menu == "🔚 Log out": 
         st.session_state.user_data = {}
+        st.session_state
         st.session_state.page = 'login'
         st.success("Logout berhasil.")
         st.rerun()
 
     # Footer
     st.markdown("<hr>", unsafe_allow_html=True)
-    st.markdown("<center><small>© 2025 e-Pajak Samsat Palembang I</small></center>", unsafe_allow_html=True)
+    st.markdown("<center><small>© 2025 SIMANPA Samsat Palembang I</small></center>", unsafe_allow_html=True)
 
 # -------------------------------
 # ROUTING HALAMAN
