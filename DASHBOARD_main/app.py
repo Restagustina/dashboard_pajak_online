@@ -3,7 +3,7 @@ import pandas as pd
 from datetime import date, timedelta
 import os
 import base64
-from utils import load_data, save_data, update_status_lunas
+from utils import load_data, load_all_data, save_data, update_status_lunas
 import openpyxl
 from streamlit.components.v1 import html
 from st_aggrid import AgGrid, GridOptionsBuilder
@@ -94,7 +94,7 @@ image_path = os.path.join(BASE_PATH, "assets", "bg.jpg")
 # -------------------------------
 # LOAD DATA
 # -------------------------------
-df_user, df_kendaraan, df_riwayat = load_data()
+df_user, df_kendaraan, df_riwayat = load_all_data()
 
 # -------------------------------
 # LOGIN PAGE
@@ -103,7 +103,7 @@ def login_page():
     set_background("DASHBOARD_main/assets/bg.jpg") #background
     if st.session_state.get("registration_success", False):
         st.success("✅ Akun berhasil didaftarkan. Silakan login.")
-        st.session_state.registration_success = False  # reset di sini setelah ditampilkan
+        st.session_state.registration_success = False  # reset setelah ditampilkan
 
     st.markdown("""
     <style>
@@ -140,12 +140,40 @@ def login_page():
     </div>
     """, unsafe_allow_html=True)
 
+    # Input login
     input_nik = st.text_input("Masukkan NIK").strip()
     input_plat = st.text_input("Masukkan Plat").strip().upper()
+    input_password = st.text_input("Masukkan Password", type="password")
 
     # Tombol Login default
     login_clicked = st.button("Login", key="login_button")
+    if login_clicked:
+        df_user, df_kendaraan, _ = load_all_data()
 
+        # Cek apakah NIK & Password valid dari df_user
+        user_match = df_user[
+            (df_user["NIK"] == input_nik) &
+            (df_user["Password"] == input_password)
+        ]
+        
+        # Cek apakah Plat cocok dengan NIK dari df_kendaraan
+        kendaraan_match = df_kendaraan[
+            (df_kendaraan["Plat"].str.upper() == input_plat) &
+            (df_kendaraan["NIK"] == input_nik)
+         ]
+        if not user_match.empty and not kendaraan_match.empty:
+            st.session_state.user_data = {
+                'NIK': input_nik,
+                'Plat': input_plat,
+                'Nama': user_match.iloc[0].get('Nama', ''),
+                'Alamat': kendaraan_match.iloc[0].get('Alamat', ''),
+                'Pajak': kendaraan_match.iloc[0].get('Pajak', '')
+            }
+            st.session_state.page = 'dashboard'
+            st.rerun()
+        else:
+            st.error("❌ NIK, Plat, atau Password salah. Silakan periksa kembali.")
+            
     # Tombol Registrasi
     st.markdown("""
     <style>
@@ -186,25 +214,6 @@ def login_page():
         if st.button("Registrasi Now", key="register_now"):
             st.session_state.page = "register"
             st.rerun()
-
-
-    # Login logic
-    if login_clicked:
-        user_match = df_user[df_user['NIK'] == input_nik]
-        kendaraan_match = df_kendaraan[df_kendaraan['Plat'].str.upper() == input_plat]
-
-        if not user_match.empty and not kendaraan_match.empty:
-            st.session_state.user_data = {
-                'NIK': input_nik,
-                'Plat': input_plat,
-                'Nama': user_match.iloc[0].get('Nama', ''),
-                'Alamat': kendaraan_match.iloc[0].get('Alamat', ''),
-                'Pajak': kendaraan_match.iloc[0].get('Pajak', '')
-            }
-            st.session_state.page = 'dashboard'
-            st.rerun()
-        else:
-            st.error("❌ Data tidak ditemukan. Periksa kembali NIK dan Plat.")
 
  # Tombol fallback untuk hapus param ?daftar=true
     query_params = st.query_params
@@ -247,10 +256,15 @@ def register_page():
             nama = st.text_input("Masukkan Nama Lengkap").strip()
             alamat = st.text_input("Masukkan Alamat").strip()
             plat = st.text_input("Masukkan Plat Kendaraan").strip().upper()
+            norangka = st.text_input("Nomor Rangka Kendaraan")
+            merek = st.text_input("Merek / Type Kendaraan")
+            model = st.text_input("Model Kendaraan (contoh: Sepeda Motor)")
+            warna = st.selectbox("Warna Kendaraan", ["Hitam", "Putih", "Merah", "Biru", "Abu-abu", "Kuning"])
             pajak = st.number_input("Masukkan Jumlah Pajak (Rp)", min_value=0)
             default_tempo = date.today() + timedelta(days=365)
             tanggal_jatuh_tempo = st.date_input("Masukkan Tanggal Jatuh Tempo", value=default_tempo)
-
+            password = st.text_input("Buat Password", type="password", help="Gunakan huruf besar, huruf kecil, angka, dan minimal 6 karakter.")
+            
             submit = st.form_submit_button("Daftar")
 
         if submit:
@@ -271,13 +285,23 @@ def register_page():
                 st.error("❌ Plat kendaraan sudah terdaftar.")
                 return
 
+            # Validasi password (minimal 6 karakter, huruf besar, huruf kecil, angka)
+            import re
+            if not re.match(r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{6,}$', password):
+                st.error("❌ Password harus mengandung huruf besar, huruf kecil, angka, dan minimal 6 karakter.")
+                return
+
             # Simpan data
-            new_user = pd.DataFrame([{"NIK": nik, "Nama": nama}])
+            new_user = pd.DataFrame([{"NIK": nik, "Nama": nama, "Password": password}])
             new_kendaraan = pd.DataFrame([{
                 "NIK": nik,
-                "Plat": plat,
                 "Nama": nama,
                 "Alamat": alamat,
+                "Plat": plat,
+                "Nomor_Rangka": norangka,
+                "Merek": merek,
+                "Model": model,
+                "Warna": warna,
                 "Pajak_Terhutang": pajak,
                 "Tanggal_Jatuh_Tempo": tanggal_jatuh_tempo,
                 "Pajak": pajak
@@ -295,7 +319,7 @@ def register_page():
     else:
         st.markdown("<div style='text-align: center;'>", unsafe_allow_html=True)
         st.success("✅ Akun berhasil didaftarkan. Silakan login.")
-        # Gunakan tombol yang hanya tampil di register_page
+
         if st.button("🔐 Kembali ke Halaman Login", use_container_width=True, key="back_to_login_from_register"):
             st.session_state.page = "login"
             st.query_params.clear() # hapus query param ?daftar=true
@@ -436,6 +460,16 @@ def dashboard_page():
         </style>
         """, unsafe_allow_html=True)
 
+        df_kendaraan = load_data("kendaraan")
+        kendaraan = df_kendaraan[df_kendaraan['NIK'] == nik].iloc[0]
+
+        norangka = kendaraan['Nomor_Rangka']
+        merek = kendaraan['Merek']
+        model = kendaraan['Model']
+        warna = kendaraan['Warna']
+        pajak = float(kendaraan['Pajak_Terhutang']) 
+        tempo = kendaraan['Tanggal_Jatuh_Tempo']
+
         html(f"""
             <style>
             .profil-box {{
@@ -445,7 +479,7 @@ def dashboard_page():
                 padding: 2px;
                 padding-left: 50px;
                 padding-bottom: 50px;
-                max-width: 600px;
+                max-width: 700px;
                 margin: auto;
                 box-shadow: 0 4px 8px rgba(0,0,0,0.1);
                 font-family: 'Arial', sans-serif;
@@ -461,20 +495,25 @@ def dashboard_page():
             }}
             .profil-table td.label {{
                 font-weight: bold;
-                width: 150px;
+                width: 180px;
             }}
             </style>
             <div class="profil-box">
-                <h4 style="text-align:center;">Data Profil</h4>
+                <h4 style="text-align:center;">Data Profil Wajib Pajak</h4>
                 <table class="profil-table">
                     <tr><td class="label">NIK</td><td>: {nik}</td></tr>
                     <tr><td class="label">Nama</td><td>: {nama}</td></tr>
                     <tr><td class="label">Plat Nomor</td><td>: {plat}</td></tr>
                     <tr><td class="label">Alamat</td><td>: {alamat}</td></tr>
+                    <tr><td class="label">Nomor Rangka</td><td>: {norangka}</td></tr>
+                    <tr><td class="label">Merek</td><td>: {merek}</td></tr>
+                    <tr><td class="label">Model</td><td>: {model}</td></tr>
+                    <tr><td class="label">Warna</td><td>: {warna}</td></tr>
+                    <tr><td class="label">Pajak Terhutang</td><td>: Rp {pajak:,.0f}</td></tr>
+                    <tr><td class="label">Tanggal Jatuh Tempo</td><td>: {tempo}</td></tr>
                 </table>
             </div>
-        """, height=500)
-
+        """, height=600)
 
     # Halaman Statistik Pajak User
     elif menu == "📊 Statistik Saya":
@@ -492,7 +531,7 @@ def dashboard_page():
         nik_login = st.session_state.get("nik")
 
         # Filter riwayat berdasarkan NIK
-        _, _, df_riwayat = load_data()
+        df_riwayat = load_data("riwayat")
         df_user = df_riwayat[df_riwayat["NIK"] == nik]
 
         if df_user.empty:
@@ -622,7 +661,7 @@ def dashboard_page():
                 try:
                     waktu = pd.Timestamp.now().strftime("%d-%m-%Y %H:%M")
 
-                    df_user, df_kendaraan, df_riwayat = load_data()
+                    df_user, df_kendaraan, df_riwayat = load_all_data()
                     data_user = df_kendaraan[df_kendaraan["NIK"] == nik]
 
                     if not data_user.empty:
@@ -651,7 +690,7 @@ def dashboard_page():
                         st.cache_data.clear()
 
                         # Reload dan tampilkan data terbaru
-                        _, _, df_riwayat = load_data()
+                        df_riwayat = load_data("riwayat")
                         st.markdown(
                             f"""
                             <div style="

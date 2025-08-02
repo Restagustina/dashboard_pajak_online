@@ -18,32 +18,43 @@ print("PATH_KENDARAAN:", PATH_KENDARAAN)
 print("PATH_RIWAYAT:", PATH_RIWAYAT)
 
 @st.cache_data(ttl=1)  # Tambahkan ttl agar cache cepat refresh 1 detik
-def load_data():
+def load_data(data_type):
     """
-    Load seluruh data (user, kendaraan, riwayat) dari file Excel.
-    Return dalam bentuk tiga DataFrame.
+    Load data tertentu ('user', 'kendaraan', atau 'riwayat') dari file Excel.
+    Return 1 DataFrame sesuai permintaan.
     """
-    if os.path.exists(PATH_USER):
-        df_user = pd.read_excel(PATH_USER, dtype=str).fillna("").applymap(str.strip)
-    else:
-        df_user = pd.DataFrame(columns=["NIK", "Nama"])
+    if data_type == "user":
+        if os.path.exists(PATH_USER):
+            return pd.read_excel(PATH_USER, dtype=str).fillna("").applymap(str.strip)
+        else:
+            return pd.DataFrame(columns=["NIK", "Plat"])
 
-    if os.path.exists(PATH_KENDARAAN):
-        df_kendaraan = pd.read_excel(PATH_KENDARAAN, dtype=str).fillna("").applymap(str.strip)
-    else:
-        df_kendaraan = pd.DataFrame(columns=[
-            "NIK", "Plat", "Nama", "Alamat", "Pajak_Terhutang",
-            "Tanggal_Jatuh_Tempo", "Pajak"
-        ])
+    elif data_type == "kendaraan":
+        if os.path.exists(PATH_KENDARAAN):
+            return pd.read_excel(PATH_KENDARAAN, dtype=str).fillna("").applymap(str.strip)
+        else:
+            return pd.DataFrame(columns=[
+                "NIK", "Plat", "Nama", "Alamat", "Pajak_Terhutang",
+                "Tanggal_Jatuh_Tempo", "Pajak", "Nomor_Rangka", "Merek", "Model", "Warna"
+            ])
 
-    if os.path.exists(PATH_RIWAYAT):
-        df_riwayat = pd.read_excel(PATH_RIWAYAT, dtype=str).fillna("").applymap(str.strip)
-    else:
-        df_riwayat = pd.DataFrame(columns=[
-            "NIK", "Plat", "Nama", "Tanggal_Bayar", "Jumlah", "Metode"
-        ])
+    elif data_type == "riwayat":
+        if os.path.exists(PATH_RIWAYAT):
+            return pd.read_excel(PATH_RIWAYAT, dtype=str).fillna("").applymap(str.strip)
+        else:
+            return pd.DataFrame(columns=[
+                "NIK", "Plat", "Nama", "Tanggal_Bayar", "Jumlah", "Metode"
+            ])
 
-    return df_user, df_kendaraan, df_riwayat
+    else:
+        raise ValueError(f"Tipe data tidak dikenal: {data_type}")
+
+def load_all_data():
+    return (
+        load_data("user"),
+        load_data("kendaraan"),
+        load_data("riwayat")
+    )
 
 def save_data(new_user, new_kendaraan):
     """
@@ -52,7 +63,7 @@ def save_data(new_user, new_kendaraan):
     """
     os.makedirs(DATA_FOLDER, exist_ok=True)
 
-    df_user, df_kendaraan, _ = load_data()
+    df_user, df_kendaraan, _ = load_all_data()
 
     # Tambah dan hindari duplikat berdasarkan NIK dan Plat
     df_user = pd.concat([df_user, new_user], ignore_index=True)
