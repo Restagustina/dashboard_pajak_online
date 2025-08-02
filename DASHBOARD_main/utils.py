@@ -27,7 +27,7 @@ def load_data(data_type):
         if os.path.exists(PATH_USER):
             return pd.read_excel(PATH_USER, dtype=str).fillna("").applymap(str.strip)
         else:
-            return pd.DataFrame(columns=["NIK", "Plat"])
+            return pd.DataFrame(columns=["NIK", "Plat", "Nama", "Password"])
 
     elif data_type == "kendaraan":
         if os.path.exists(PATH_KENDARAAN):

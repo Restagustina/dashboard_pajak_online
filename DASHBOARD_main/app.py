@@ -446,8 +446,7 @@ def dashboard_page():
         "👤 Profil", 
         "📊 Statistik Saya",  
         "💳 Bayar Pajak",  
-        "📜 Riwayat Pembayaran",  
-        "🔚 Logout" 
+        "📜 Riwayat Pembayaran",   
     ])
 
     # Halaman Profil
@@ -777,12 +776,11 @@ def dashboard_page():
                 st.error(f"Gagal membaca data riwayat: {e}")
 
     # Logout
-    elif menu == "🔚 Log out": 
-        st.session_state.user_data = {}
-        st.session_state
-        st.session_state.page = 'login'
-        st.success("Logout berhasil.")
+    if st.sidebar.button("🔚Logout"):
+        st.session_state.clear()
+        st.session_state.page = "login"
         st.rerun()
+
 
     # Footer
     st.markdown("<hr>", unsafe_allow_html=True)
