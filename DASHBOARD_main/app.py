@@ -7,7 +7,6 @@ from utils import load_data, load_all_data, save_data, update_status_lunas, buat
 import openpyxl
 from streamlit.components.v1 import html
 from st_aggrid import AgGrid, GridOptionsBuilder
-from utils import buat_status_pengiriman
 
 # -------------------------------
 # SESSION STATE & QUERY PARAM DETECTION
@@ -95,7 +94,7 @@ image_path = os.path.join(BASE_PATH, "assets", "bg.jpg")
 # -------------------------------
 # LOAD DATA
 # -------------------------------
-df_user, df_kendaraan, df_riwayat = load_all_data()
+df_user, df_kendaraan, df_riwayat, df_pengiriman = load_all_data()
 
 # -------------------------------
 # LOGIN PAGE
@@ -149,7 +148,7 @@ def login_page():
     # Tombol Login default
     login_clicked = st.button("Login", key="login_button")
     if login_clicked:
-        df_user, df_kendaraan, _ = load_all_data()
+        df_user, df_kendaraan, _, _ = load_all_data()
 
         # Cek apakah NIK & Password valid dari df_user
         user_match = df_user[
@@ -661,7 +660,7 @@ def dashboard_page():
                 try:
                     waktu = pd.Timestamp.now().strftime("%d-%m-%Y %H:%M")
 
-                    df_user, df_kendaraan, df_riwayat = load_all_data()
+                    df_user, df_kendaraan, df_riwayat, df_pengiriman  = load_all_data()
                     data_user = df_kendaraan[df_kendaraan["NIK"] == nik]
 
                     if not data_user.empty:
@@ -693,13 +692,36 @@ def dashboard_page():
 
                         # Menu Cetak Resi
                         # ✅ Generate dan Download Resi PDF
+                        # Generate dan Download Resi PDF
                         pdf_bytes = buat_pdf_resi(nik, nama, plat, jasa, resi, alamat)
+
+                        # Custom CSS khusus untuk tombol download PDF
+                        custom_button_css = """
+                        <style>
+                        div.stDownloadButton > button:first-child {
+                            background-color: #4CAF50;
+                            color: white;
+                            font-weight: bold;
+                            border-radius: 8px;
+                            padding: 0.6em 1.2em;
+                            border: none;
+                            transition: background-color 0.3s ease;
+                        }
+                        div.stDownloadButton > button:first-child:hover {
+                            background-color: #45a049;
+                        }
+                        </style>
+                        """
+                        st.markdown(custom_button_css, unsafe_allow_html=True)
+
+                        # Tombol Download PDF
                         st.download_button(
                             label="📄 Cetak Resi (PDF)",
                             data=pdf_bytes,
                             file_name=f"resi_{plat}_{resi}.pdf",
                             mime="application/pdf"
                         )
+
 
                         # Clear cache sebelum membaca ulang
                         st.cache_data.clear()
@@ -773,6 +795,78 @@ def dashboard_page():
                         theme="balham",
                         fit_columns_on_grid_load=False
                     )
+
+                    # =========================
+                    # 🔄 Status Pengiriman
+                    # =========================
+                    df_pengiriman = pd.read_excel("DASHBOARD_main/status_pengiriman.xlsx", dtype={"NIK": str})
+                    df_pengguna_pengiriman = df_pengiriman[(df_pengiriman["NIK"] == nik)]
+
+                    if not df_pengguna_pengiriman.empty:
+                        st.markdown("### 📦 Status Pengiriman Dokumen")
+
+                        st.markdown("""
+                        <style>
+                        .status-card {
+                            background-color: #eeeeee;
+                            border: 1px solid #ccc;
+                            border-radius: 8px;
+                            padding: 15px;
+                            margin-bottom: 20px;
+                            max-width: 700px;
+                            margin-left: auto;
+                            margin-right: auto;
+                            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+                            font-family: 'Arial', sans-serif;
+                        }
+                        .status-table {
+                            width: 100%;
+                            border-collapse: collapse;
+                        }
+                        .status-table td {
+                            padding: 6px 4px;
+                            vertical-align: top;
+                            font-size: 16px;
+                        }
+                        .status-table td.label {
+                            font-weight: bold;
+                            width: 180px;
+                        }
+                        .status-tag {
+                            color: white;
+                            padding: 4px 10px;
+                            border-radius: 5px;
+                            font-weight: bold;
+                        }
+                        </style>
+                        """, unsafe_allow_html=True)
+
+                        for _, row in df_pengguna_pengiriman.sort_values("Tanggal_Bayar", ascending=False).iterrows():
+                            status = row["Status_Pengiriman"]
+                            tanggal_kirim = row["Tanggal_Bayar"]
+                            estimasi = (pd.to_datetime(tanggal_kirim, format="%d-%m-%Y %H:%M") + pd.Timedelta(days=2)).strftime("%d-%m-%Y")
+                            resi = row["No_Resi"]
+                            ekspedisi = row["Ekspedisi"]
+
+                            if status == "Terkirim":
+                                warna_status = "#28a745"  # hijau
+                            elif status == "Diproses":
+                                warna_status = "#ffc107"  # kuning
+                            else:
+                                warna_status = "#6c757d"  # abu
+
+                            st.markdown(f"""
+                            <div class="status-card">
+                                <table class="status-table">
+                                    <tr><td class="label">📦 Jasa Pengiriman</td><td>: {ekspedisi}</td></tr>
+                                    <tr><td class="label">🧾 Nomor Resi</td><td>: <code>{resi}</code></td></tr>
+                                    <tr><td class="label">📤 Tanggal Kirim</td><td>: {tanggal_kirim}</td></tr>
+                                    <tr><td class="label">📅 Estimasi Tiba</td><td>: {estimasi}</td></tr>
+                                    <tr><td class="label">📌 Status</td>
+                                        <td>: <span class="status-tag" style="background-color:{warna_status};">{status}</span></td></tr>
+                                </table>
+                            </div>
+                            """, unsafe_allow_html=True)
 
                 else:
                     st.markdown("""

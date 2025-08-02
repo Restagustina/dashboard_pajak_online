@@ -49,6 +49,17 @@ def load_data(data_type):
             return pd.DataFrame(columns=[
                 "NIK", "Plat", "Nama", "Tanggal_Bayar", "Jumlah", "Metode"
             ])
+        
+    elif data_type == "pengiriman":
+        if os.path.exists(PATH_STATUS):
+            return pd.read_excel(PATH_STATUS, dtype=str).fillna("").applymap(str.strip)
+        else:
+            df_kosong = pd.DataFrame(columns=[
+                "NIK", "Plat", "Nama", "Alamat", "Tanggal Pengiriman",
+                "Ekspedisi", "Nomor Resi", "Status", "Estimasi Terkirim"
+            ])
+            df_kosong.to_excel(PATH_STATUS, index=False)
+            return df_kosong
 
     else:
         raise ValueError(f"Tipe data tidak dikenal: {data_type}")
@@ -57,7 +68,8 @@ def load_all_data():
     return (
         load_data("user"),
         load_data("kendaraan"),
-        load_data("riwayat")
+        load_data("riwayat"),
+        load_data("pengiriman") 
     )
 
 def save_data(new_user, new_kendaraan):
@@ -114,33 +126,46 @@ def update_status_lunas(nik, plat):
 def buat_status_pengiriman(nik, plat, ekspedisi):
     """
     Simulasi pembuatan status pengiriman dan nomor resi.
+    Data disimpan ke status_pengiriman.xlsx.
     """
     nomor_resi = f"RESI{random.randint(100000, 999999)}"
-    
-    df = pd.read_excel(PATH_KENDARAAN, dtype=str).fillna("")
-    
-    # Tambahkan kolom 'Status_Pengiriman' dan 'No_Resi' jika belum ada
-    if 'Status_Pengiriman' not in df.columns:
-        df['Status_Pengiriman'] = ''
-    if 'No_Resi' not in df.columns:
-        df['No_Resi'] = ''
-    if 'Ekspedisi' not in df.columns:
-        df['Ekspedisi'] = ''
-    
-    mask = (df['NIK'] == nik) & (df['Plat'] == plat)
-    df.loc[mask, 'Status_Pengiriman'] = 'Diproses'
-    df.loc[mask, 'No_Resi'] = nomor_resi
-    df.loc[mask, 'Ekspedisi'] = ekspedisi
+    status = "Diproses"
+    tanggal_bayar = datetime.datetime.now().strftime("%d-%m-%Y %H:%M")
 
-    df.to_excel(PATH_KENDARAAN, index=False)
+    df_kendaraan = load_data("kendaraan")
+    df_pengiriman = load_data("pengiriman")
+
+    # Cari informasi pengguna
+    kendaraan = df_kendaraan[(df_kendaraan["NIK"] == nik) & (df_kendaraan["Plat"] == plat)]
+    if kendaraan.empty:
+        return None  # Tidak ditemukan
+
+    row = kendaraan.iloc[0]
+
+    data_baru = pd.DataFrame([{
+        "NIK": nik,
+        "Plat": plat,
+        "Nama": row["Nama"],
+        "Alamat": row["Alamat"],
+        "Tanggal_Bayar": tanggal_bayar,
+        "Ekspedisi": ekspedisi,
+        "No_Resi": nomor_resi,
+        "Status_Pengiriman": status
+    }])
+
+    # Gabungkan dan hapus duplikat berdasarkan NIK + Plat
+    df_pengiriman = pd.concat([df_pengiriman, data_baru], ignore_index=True)
+    df_pengiriman.drop_duplicates(subset=["NIK", "Plat"], keep="last", inplace=True)
+
+    # Simpan
+    df_pengiriman.to_excel(PATH_STATUS, index=False)
     return nomor_resi
 
 def update_status_pengiriman_otomatis():
-    df = pd.read_excel(PATH_KENDARAAN, dtype={"NIK": str})
+    df = load_data("pengiriman")
 
     now = pd.Timestamp.now()
 
-    # Pastikan kolom yang dibutuhkan ada
     if "Status_Pengiriman" in df.columns and "Tanggal_Bayar" in df.columns:
         for i, row in df.iterrows():
             if row["Status_Pengiriman"] == "Diproses":
@@ -151,8 +176,7 @@ def update_status_pengiriman_otomatis():
                 except:
                     continue
 
-        # Simpan ulang
-        df.to_excel(PATH_KENDARAAN, index=False)
+        df.to_excel(PATH_STATUS, index=False)
 
 def buat_pdf_resi(nik, nama, plat, ekspedisi, nomor_resi, alamat):
     pdf = FPDF()
