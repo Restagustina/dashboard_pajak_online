@@ -3,10 +3,11 @@ import pandas as pd
 from datetime import date, timedelta
 import os
 import base64
-from utils import load_data, load_all_data, save_data, update_status_lunas
+from utils import load_data, load_all_data, save_data, update_status_lunas, buat_status_pengiriman, buat_pdf_resi
 import openpyxl
 from streamlit.components.v1 import html
 from st_aggrid import AgGrid, GridOptionsBuilder
+from utils import buat_status_pengiriman
 
 # -------------------------------
 # SESSION STATE & QUERY PARAM DETECTION
@@ -680,16 +681,31 @@ def dashboard_page():
                             "Jasa_Pengiriman": jasa
                             }])
 
+                        # Simpan riwayat pembayaran
                         df_riwayat = pd.concat([df_riwayat, new_row], ignore_index=True)
                         df_riwayat.to_excel("DASHBOARD_main/riwayat_pembayaran.xlsx", index=False)
 
+                        # Update status pembayaran jadi Lunas
                         update_status_lunas(nik, plat)
+                        # Buat status pengiriman & nomor resi
+                        resi = buat_status_pengiriman(nik, plat, ekspedisi=jasa)
+                        st.info(f"📦 Dokumen Anda akan dikirim via {jasa}.\n\nNomor Resi: `{resi}`")
+
+                        # Menu Cetak Resi
+                        # ✅ Generate dan Download Resi PDF
+                        pdf_bytes = buat_pdf_resi(nik, nama, plat, jasa, resi, alamat)
+                        st.download_button(
+                            label="📄 Cetak Resi (PDF)",
+                            data=pdf_bytes,
+                            file_name=f"resi_{plat}_{resi}.pdf",
+                            mime="application/pdf"
+                        )
 
                         # Clear cache sebelum membaca ulang
                         st.cache_data.clear()
-
-                        # Reload dan tampilkan data terbaru
                         df_riwayat = load_data("riwayat")
+
+                        # Tampilkan notifikasi sukses
                         st.markdown(
                             f"""
                             <div style="

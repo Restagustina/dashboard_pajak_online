@@ -1,6 +1,9 @@
 import os
 import streamlit as st
 import pandas as pd
+import random
+from fpdf import FPDF
+import datetime
 
 # Path utama
 BASE_PATH = os.path.dirname(os.path.abspath(__file__))
@@ -10,6 +13,7 @@ DATA_FOLDER = BASE_PATH  # sudah di dalam folder DASHBOARD_main
 PATH_USER = os.path.join(DATA_FOLDER, "data_user.xlsx")
 PATH_KENDARAAN = os.path.join(DATA_FOLDER, "data_kendaraan.xlsx")
 PATH_RIWAYAT = os.path.join(DATA_FOLDER, "riwayat_pembayaran.xlsx")
+PATH_STATUS = os.path.join(DATA_FOLDER, "status_pengiriman.xlsx")
 
 # Debug path
 print("BASE_PATH:", BASE_PATH)
@@ -106,3 +110,73 @@ def update_status_lunas(nik, plat):
 
     df_kendaraan.to_excel(PATH_KENDARAAN, index=False)
     st.cache_data.clear()
+
+def buat_status_pengiriman(nik, plat, ekspedisi):
+    """
+    Simulasi pembuatan status pengiriman dan nomor resi.
+    """
+    nomor_resi = f"RESI{random.randint(100000, 999999)}"
+    
+    df = pd.read_excel(PATH_KENDARAAN, dtype=str).fillna("")
+    
+    # Tambahkan kolom 'Status_Pengiriman' dan 'No_Resi' jika belum ada
+    if 'Status_Pengiriman' not in df.columns:
+        df['Status_Pengiriman'] = ''
+    if 'No_Resi' not in df.columns:
+        df['No_Resi'] = ''
+    if 'Ekspedisi' not in df.columns:
+        df['Ekspedisi'] = ''
+    
+    mask = (df['NIK'] == nik) & (df['Plat'] == plat)
+    df.loc[mask, 'Status_Pengiriman'] = 'Diproses'
+    df.loc[mask, 'No_Resi'] = nomor_resi
+    df.loc[mask, 'Ekspedisi'] = ekspedisi
+
+    df.to_excel(PATH_KENDARAAN, index=False)
+    return nomor_resi
+
+def update_status_pengiriman_otomatis():
+    df = pd.read_excel(PATH_KENDARAAN, dtype={"NIK": str})
+
+    now = pd.Timestamp.now()
+
+    # Pastikan kolom yang dibutuhkan ada
+    if "Status_Pengiriman" in df.columns and "Tanggal_Bayar" in df.columns:
+        for i, row in df.iterrows():
+            if row["Status_Pengiriman"] == "Diproses":
+                try:
+                    tanggal_bayar = pd.to_datetime(row["Tanggal_Bayar"], format="%d-%m-%Y %H:%M", errors='coerce')
+                    if pd.notnull(tanggal_bayar) and (now - tanggal_bayar).days >= 2:
+                        df.at[i, "Status_Pengiriman"] = "Terkirim"
+                except:
+                    continue
+
+        # Simpan ulang
+        df.to_excel(PATH_KENDARAAN, index=False)
+
+def buat_pdf_resi(nik, nama, plat, ekspedisi, nomor_resi, alamat):
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", size=12)
+
+    pdf.cell(200, 10, txt="BUKTI PENGIRIMAN DOKUMEN KENDARAAN", ln=True, align="C")
+    pdf.ln(10)
+
+    data = [
+        ("NIK", nik),
+        ("Nama", nama),
+        ("Plat Kendaraan", plat),
+        ("Jasa Pengiriman", ekspedisi),
+        ("Nomor Resi", nomor_resi),
+        ("Alamat Tujuan", alamat),
+        ("Tanggal Cetak", datetime.datetime.now().strftime("%d-%m-%Y %H:%M"))
+    ]
+
+    for label, value in data:
+        pdf.cell(50, 10, txt=f"{label}", ln=0)
+        pdf.cell(100, 10, txt=f": {value}", ln=1)
+
+    pdf.ln(10)
+    pdf.cell(0, 10, txt="Terima kasih telah menggunakan layanan SIMANPA I.", ln=True)
+
+    return pdf.output(dest='S').encode('latin-1')  # PDF in bytes
