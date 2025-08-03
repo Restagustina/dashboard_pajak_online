@@ -1,4 +1,4 @@
 streamlit
 pandas
 openpyxl
-st-aggrid
+fpdf==1.7.2
