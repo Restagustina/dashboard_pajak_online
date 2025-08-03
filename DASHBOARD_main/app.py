@@ -779,22 +779,35 @@ def dashboard_page():
                     </div>
                     """, unsafe_allow_html=True)
 
-                    gb = GridOptionsBuilder.from_dataframe(df_user)
+                    # Buat tabel HTML tanpa indeks
+                    html_table = df_user.to_html(index=False, escape=False)
 
-                    # Auto width untuk semua kolom
-                    gb.configure_default_column(autoWidth=True)
+                    # Styling CSS
+                    tabel_style = """
+                    <style>
+                        table {
+                            width: 100%;
+                            border-collapse: collapse;
+                            margin-bottom: 1em;
+                            font-size: 14px;
+                        }
+                        th, td {
+                            border: 1px solid #999;
+                            padding: 8px;
+                            text-align: center;
+                        }
+                        th {
+                            background-color: #f8f9fa;
+                            color: #343a40;
+                        }
+                        td {
+                            background-color: #ffffff;
+                        }
+                    </style>
+                    """
 
-                    # Opsional: pagination + layout
-                    gb.configure_grid_options(domLayout='normal')
-                    gb.configure_pagination(paginationAutoPageSize=True)
-
-                    # Tampilkan
-                    AgGrid(
-                        df_user,
-                        gridOptions=gb.build(),
-                        theme="balham",
-                        fit_columns_on_grid_load=False
-                    )
+                    # Tampilkan tabel
+                    st.markdown(tabel_style + html_table, unsafe_allow_html=True)
 
                     # =========================
                     # 🔄 Status Pengiriman
