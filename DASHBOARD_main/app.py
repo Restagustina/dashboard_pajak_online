@@ -6,7 +6,6 @@ import base64
 from utils import load_data, load_all_data, save_data, update_status_lunas, buat_status_pengiriman, buat_pdf_resi
 import openpyxl
 from streamlit.components.v1 import html
-from st_aggrid import AgGrid, GridOptionsBuilder
 
 # -------------------------------
 # SESSION STATE & QUERY PARAM DETECTION
