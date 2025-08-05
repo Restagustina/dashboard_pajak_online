@@ -208,19 +208,17 @@ def buat_pdf_resi(nik, nama, plat, ekspedisi, nomor_resi, alamat):
 
     return pdf.output(dest='S').encode('latin-1')  # PDF in bytes
 
-    # ============================
+# ============================
 # FUNGSI CEK JATUH TEMPO
 # ============================
+def hitung_jatuh_tempo(riwayat_user):
+    if riwayat_user.empty:
+        return None, None, None  # Belum pernah bayar
 
-def cek_jatuh_tempo_dekat(tanggal_jatuh_tempo_str, batas_hari=30):
-    """
-    Mengecek apakah tanggal jatuh tempo (format 'YYYY-MM-DD') berada dalam batas hari tertentu dari hari ini.
-    Default batas = 30 hari.
-    """
-    try:
-        jatuh_tempo = datetime.strptime(tanggal_jatuh_tempo_str[:10], "%Y-%m-%d")  # Ambil 10 char awal untuk amankan format
-        hari_ini = datetime.today()
-        selisih = jatuh_tempo - hari_ini
-        return 0 <= selisih.days <= batas_hari
-    except:
-        return False
+    # Ambil pembayaran terakhir
+    riwayat_user = riwayat_user.sort_values(by="Tanggal_Bayar", ascending=False)
+    terakhir_bayar = pd.to_datetime(riwayat_user.iloc[0]["Tanggal_Bayar"])
+    jatuh_tempo = terakhir_bayar + timedelta(days=365)
+    hari_tersisa = (jatuh_tempo - datetime.today()).days
+
+    return terakhir_bayar.date(), jatuh_tempo.date(), hari_tersisa

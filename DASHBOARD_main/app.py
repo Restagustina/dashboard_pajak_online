@@ -3,7 +3,8 @@ import pandas as pd
 from datetime import timedelta, timezone, date
 import os
 import base64
-from utils import load_data, load_all_data, save_data, update_status_lunas, buat_status_pengiriman, buat_pdf_resi, cek_jatuh_tempo_dekat
+from utils import load_data, load_all_data, save_data, update_status_lunas, buat_status_pengiriman, buat_pdf_resi, hitung_jatuh_tempo
+import streamlit.components.v1 as components
 from streamlit.components.v1 import html
 import calendar
 import plotly.express as px
@@ -439,16 +440,16 @@ def dashboard_page():
     """, unsafe_allow_html=True)
 
     # Sidebar navigasi
-    st.sidebar.markdown("## 🧭 Menu Navigasi")
+    st.sidebar.markdown("## Menu Navigasi")
     menu = st.sidebar.radio("Pilih Halaman", [
-        "👤 Profil", 
-        "📊 Dashboard",  
-        "💳 Bayar Pajak",  
-        "📜 Riwayat Pembayaran",   
+        "Profil", 
+        "Dashboard",  
+        "Bayar Pajak",  
+        "Riwayat Pembayaran",   
     ])
 
     # Halaman Profil
-    if menu == "👤 Profil":
+    if menu == "Profil":
         st.markdown("""
         <style>
         .stApp {
@@ -464,57 +465,78 @@ def dashboard_page():
         merek = kendaraan['Merek']
         model = kendaraan['Model']
         warna = kendaraan['Warna']
-        pajak = float(kendaraan['Pajak_Terhutang']) 
-        tempo = kendaraan['Tanggal_Jatuh_Tempo']
+        pajak = float(kendaraan['Pajak_Terhutang'])
 
-        html(f"""
+        html_content = f"""
+            <div class="profile-container">
+                <div class="profile-title">Data Profil Wajib Pajak</div>
+
+                <div class="field-label">NIK</div>
+                <div class="field-box">{nik}</div>
+
+                <div class="field-label">Nama</div>
+                <div class="field-box">{nama}</div>
+
+                <div class="field-label">Plat Nomor</div>
+                <div class="field-box">{plat}</div>
+
+                <div class="field-label">Alamat</div>
+                <div class="field-box">{alamat}</div>
+
+                <div class="field-label">Nomor Rangka</div>
+                <div class="field-box">{norangka}</div>
+
+                <div class="field-label">Merek</div>
+                <div class="field-box">{merek}</div>
+
+                <div class="field-label">Model</div>
+                <div class="field-box">{model}</div>
+
+                <div class="field-label">Warna</div>
+                <div class="field-box">{warna}</div>
+
+                <div class="field-label">Pajak Terhutang</div>
+                <div class="field-box">Rp {pajak:,.0f}</div>
+            </div>
+
             <style>
-            .profil-box {{
-                background-color: #eeeeee;
-                border: 1px solid #ccc;
-                border-radius: 8px;
-                padding: 20px 40px;
-                max-width: 700px;
+            .profile-container {{
+                background-color: white;
+                padding: 2rem 2.5rem;
+                border-radius: 18px;
+                max-width: 750px;
                 margin: auto;
-                box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+                box-shadow: 0 6px 18px rgba(0, 0, 0, 0.1);
                 font-family: 'Segoe UI', sans-serif;
             }}
-            .profil-table {{
-                width: 100%;
-                border-collapse: collapse;
-            }}
-            .profil-table td {{
-                padding: 8px 5px;
-                vertical-align: top;
-                font-size: 16px;
-            }}
-            .profil-table td.label {{
+            .profile-title {{
+                font-size: 1.8rem;
                 font-weight: bold;
-                width: 180px;
-                color: #333;
+                color: #2c3e50;
+                text-align: center;
+                margin-bottom: 2rem;
+            }}
+            .field-label {{
+                font-weight: 600;
+                margin-bottom: 6px;
+                color: #34495e;
+            }}
+            .field-box {{
+                background-color: #f7f9fc;
+                border: 1px solid #dfe6e9;
+                border-radius: 8px;
+                padding: 10px 14px;
+                margin-bottom: 20px;
+                font-size: 16px;
+                color: #2d3436;
             }}
             </style>
-            <div class="profil-box">
-                <h4 style="text-align:center; background-color:#D9EAF7; padding:10px; border-radius:5px;">
-                    Data Profil Wajib Pajak
-                </h4>
-                <table class="profil-table">
-                    <tr><td class="label">NIK</td><td>: {nik}</td></tr>
-                    <tr><td class="label">Nama</td><td>: {nama}</td></tr>
-                    <tr><td class="label">Plat Nomor</td><td>: {plat}</td></tr>
-                    <tr><td class="label">Alamat</td><td>: {alamat}</td></tr>
-                    <tr><td class="label">Nomor Rangka</td><td>: {norangka}</td></tr>
-                    <tr><td class="label">Merek</td><td>: {merek}</td></tr>
-                    <tr><td class="label">Model</td><td>: {model}</td></tr>
-                    <tr><td class="label">Warna</td><td>: {warna}</td></tr>
-                    <tr><td class="label">Pajak Terhutang</td><td>: Rp {pajak:,.0f}</td></tr>
-                    <tr><td class="label">Tanggal Jatuh Tempo</td><td>: {tempo}</td></tr>
-                </table>
-            </div>
-        """, height=600)
+        """
+        components.html(html_content, height=1000)
+
 
     # Halaman Statistik Pajak User
-    elif menu == "📊 Dashboard":
+    elif menu == "Dashboard":
         st.markdown("""
         <style>
         .stApp {
@@ -553,6 +575,46 @@ def dashboard_page():
             # Konversi tanggal
             df_user["Tanggal_Bayar"] = pd.to_datetime(df_user["Tanggal_Bayar"], errors="coerce", dayfirst=True)
 
+            # Hitung informasi jatuh tempo
+            terakhir_bayar, jatuh_tempo, hari_tersisa = hitung_jatuh_tempo(df_user)
+
+            st.markdown("**Status Jatuh Tempo Pajak**")
+
+            if terakhir_bayar:
+                if hari_tersisa > 30:
+                    warna_bg = "#e0ffe0"
+                    warna_teks = "#007f00"
+                    ikon = "✅"
+                    status = "Pajak akan jatuh tempo pada:"
+                elif 0 <= hari_tersisa <= 30:
+                    warna_bg = "#fff6e0"
+                    warna_teks = "#b36b00"
+                    ikon = "⚠️"
+                    status = "Segera bayar! Jatuh tempo tinggal:"
+                else:
+                    warna_bg = "#ffe0e0"
+                    warna_teks = "#b30000"
+                    ikon = "❌"
+                    status = "Sudah terlambat bayar! Jatuh tempo:"
+
+                st.markdown(f"""
+                <div style="
+                    background-color: {warna_bg};
+                    padding: 1rem;
+                    border-radius: 10px;
+                    border-left: 8px solid {warna_teks};
+                    color: {warna_teks};
+                    font-weight: bold;
+                    font-size: 1rem;
+                ">
+                {ikon} <span style="color: {warna_teks};">{status} <strong>{jatuh_tempo.strftime('%d-%m-%Y')}</strong> ({abs(hari_tersisa)} hari {'lagi' if hari_tersisa >= 0 else 'yang lalu'})</span>
+                </div>
+                """, unsafe_allow_html=True)
+
+            else:
+                st.info("Belum ada riwayat pembayaran pajak.")
+
+                
             # Total bayar
             total_bayar = df_user["Jumlah"].astype(float).sum()
             total_transaksi = df_user.shape[0]
@@ -690,7 +752,7 @@ def dashboard_page():
                     st.plotly_chart(fig_pie, use_container_width=True)
 
     # Halaman Bayar Pajak
-    elif menu == "💳 Bayar Pajak": 
+    elif menu == "Bayar Pajak": 
         st.markdown("""
         <style>
         .stApp {
@@ -843,7 +905,7 @@ def dashboard_page():
                     st.error(f"Terjadi kesalahan saat menyimpan pembayaran: {e}")   
 
     # Halaman Riwayat Pembayaran
-    elif menu == "📜 Riwayat Pembayaran": 
+    elif menu == "Riwayat Pembayaran": 
             st.markdown("""
             <style>
             .stApp {
