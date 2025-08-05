@@ -1,11 +1,12 @@
 import streamlit as st
 import pandas as pd
-from datetime import date, timedelta
+from datetime import timedelta, timezone
 import os
 import base64
 from utils import load_data, load_all_data, save_data, update_status_lunas, buat_status_pengiriman, buat_pdf_resi
-import openpyxl
 from streamlit.components.v1 import html
+import calendar
+import plotly.express as px
 
 # -------------------------------
 # SESSION STATE & QUERY PARAM DETECTION
@@ -443,7 +444,7 @@ def dashboard_page():
     st.sidebar.markdown("## 🧭 Menu Navigasi")
     menu = st.sidebar.radio("Pilih Halaman", [
         "👤 Profil", 
-        "📊 Statistik Saya",  
+        "📊 Dashboard",  
         "💳 Bayar Pajak",  
         "📜 Riwayat Pembayaran",   
     ])
@@ -473,14 +474,12 @@ def dashboard_page():
             .profil-box {{
                 background-color: #eeeeee;
                 border: 1px solid #ccc;
-                border-radius: 5px;
-                padding: 2px;
-                padding-left: 50px;
-                padding-bottom: 50px;
+                border-radius: 8px;
+                padding: 20px 40px;
                 max-width: 700px;
                 margin: auto;
-                box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-                font-family: 'Arial', sans-serif;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+                font-family: 'Segoe UI', sans-serif;
             }}
             .profil-table {{
                 width: 100%;
@@ -494,10 +493,13 @@ def dashboard_page():
             .profil-table td.label {{
                 font-weight: bold;
                 width: 180px;
+                color: #333;
             }}
             </style>
             <div class="profil-box">
-                <h4 style="text-align:center;">Data Profil Wajib Pajak</h4>
+                <h4 style="text-align:center; background-color:#D9EAF7; padding:10px; border-radius:5px;">
+                    Data Profil Wajib Pajak
+                </h4>
                 <table class="profil-table">
                     <tr><td class="label">NIK</td><td>: {nik}</td></tr>
                     <tr><td class="label">Nama</td><td>: {nama}</td></tr>
@@ -514,7 +516,7 @@ def dashboard_page():
         """, height=600)
 
     # Halaman Statistik Pajak User
-    elif menu == "📊 Statistik Saya":
+    elif menu == "📊 Dashboard":
         st.markdown("""
         <style>
         .stApp {
@@ -524,9 +526,6 @@ def dashboard_page():
         """, unsafe_allow_html=True)
          
         st.subheader("📊 Statistik Pajak Pribadi Anda")
-
-        # Ambil NIK user yang sedang login
-        nik_login = st.session_state.get("nik")
 
         # Filter riwayat berdasarkan NIK
         df_riwayat = load_data("riwayat")
@@ -550,7 +549,7 @@ def dashboard_page():
 
         else:
             # Konversi tanggal
-            df_user["Tanggal_Bayar"] = pd.to_datetime(df_user["Tanggal_Bayar"], errors="coerce")
+            df_user["Tanggal_Bayar"] = pd.to_datetime(df_user["Tanggal_Bayar"], errors="coerce", dayfirst=True)
 
             # Total bayar
             total_bayar = df_user["Jumlah"].astype(float).sum()
@@ -558,9 +557,6 @@ def dashboard_page():
 
             # Metode favorit
             metode_fav = df_user["Metode"].mode()[0] if not df_user["Metode"].mode().empty else "-"
-
-            # Bulan paling sering bayar
-            bulan_fav = df_user["Tanggal_Bayar"].dt.month_name().value_counts().idxmax()
 
             # Card Ringkasan
             st.markdown("""
@@ -589,11 +585,37 @@ def dashboard_page():
                 </div>
             """, unsafe_allow_html=True)
 
-            # Grafik bulanan
-            df_user["Bulan"] = df_user["Tanggal_Bayar"].dt.strftime('%B')
-            bayar_per_bulan = df_user.groupby("Bulan")["Jumlah"].sum().reset_index()
+            # Visualisasi Data
+            with st.expander("📊 Statistik"):
+                # ========= Bar Chart: Pembayaran per Bulan =========
+                df_user["Bulan"] = df_user["Tanggal_Bayar"].dt.strftime('%B')
+                bayar_per_bulan = df_user.groupby("Bulan")["Jumlah"].sum().reset_index()
+                bayar_per_bulan["Bulan"] = pd.Categorical(
+                    bayar_per_bulan["Bulan"], categories=calendar.month_name[1:], ordered=True
+                )
+                bayar_per_bulan = bayar_per_bulan.sort_values("Bulan")
 
-            st.bar_chart(bayar_per_bulan.rename(columns={"Jumlah": "Total Pembayaran"}).set_index("Bulan"))
+                st.subheader("📅 Total Pembayaran per Bulan")
+                st.bar_chart(bayar_per_bulan.set_index("Bulan"))
+
+                # ========= Line Chart: Tren Pembayaran =========
+                df_user_sorted = df_user.sort_values("Tanggal_Bayar")
+                df_trend = df_user_sorted.groupby("Tanggal_Bayar")["Jumlah"].sum().reset_index()
+
+                st.subheader("📈 Tren Pembayaran Pajak")
+                st.line_chart(df_trend.rename(columns={"Tanggal_Bayar": "Tanggal"}).set_index("Tanggal"))
+
+                # ========= Histogram: Distribusi Jumlah Pembayaran =========
+                st.subheader("🔢 Histogram Jumlah Pembayaran")
+                fig_hist = px.histogram(df_user, x="Jumlah", nbins=10, title="Distribusi Jumlah Pembayaran")
+                st.plotly_chart(fig_hist, use_container_width=True)
+
+                # ========= Pie Chart: Metode Pembayaran =========
+                st.subheader("🥧 Distribusi Metode Pembayaran")
+                metode_counts = df_user["Metode"].value_counts().reset_index()
+                metode_counts.columns = ["Metode", "Jumlah"]
+                fig_pie = px.pie(metode_counts, names="Metode", values="Jumlah", title="Metode Pembayaran yang Digunakan")
+                st.plotly_chart(fig_pie, use_container_width=True)
 
     # Halaman Bayar Pajak
     elif menu == "💳 Bayar Pajak": 
@@ -657,7 +679,9 @@ def dashboard_page():
                 st.warning("⚠️ Harap lengkapi semua data pengiriman dokumen sebelum membayar.")
             else:
                 try:
-                    waktu = pd.Timestamp.now().strftime("%d-%m-%Y %H:%M")
+                    # Set zona waktu WIB (Waktu Indonesia Barat)
+                    wib = timezone(timedelta(hours=7))
+                    waktu = pd.Timestamp.now(wib).strftime("%d-%m-%Y %H:%M")
 
                     df_user, df_kendaraan, df_riwayat, df_pengiriman  = load_all_data()
                     data_user = df_kendaraan[df_kendaraan["NIK"] == nik]
@@ -690,8 +714,6 @@ def dashboard_page():
                         st.info(f"📦 Dokumen Anda akan dikirim via {jasa}.\n\nNomor Resi: `{resi}`")
 
                         # Menu Cetak Resi
-                        # ✅ Generate dan Download Resi PDF
-                        # Generate dan Download Resi PDF
                         pdf_bytes = buat_pdf_resi(nik, nama, plat, jasa, resi, alamat)
 
                         # Custom CSS khusus untuk tombol download PDF
@@ -778,36 +800,54 @@ def dashboard_page():
                     </div>
                     """, unsafe_allow_html=True)
 
-                    # Buat tabel HTML tanpa indeks
-                    html_table = df_user.to_html(index=False, escape=False)
+                    # html_table = df_user.to_html(index=False, escape=False)
+                    html_table = df_user.to_html(index=False, escape=False, classes="tabel-user")
 
                     # Styling CSS
                     tabel_style = """
                     <style>
-                        table {
+                        table.tabel-user {
                             width: 100%;
                             border-collapse: collapse;
                             margin-bottom: 1em;
-                            font-size: 14px;
+                            font-size: 10px;
+                            table-layout: fixed;
                         }
-                        th, td {
-                            border: 1px solid #999;
-                            padding: 8px;
-                            text-align: center;
+                        table.tabel-user th, table.tabel-user td {
+                            border: 1px solid #ccc;
+                            padding: 10px;
+                            text-align: left;
+                            word-wrap: break-word;
+                            overflow-wrap: break-word;
                         }
-                        th {
-                            background-color: #f8f9fa;
-                            color: #343a40;
+                        table.tabel-user th {
+                            background-color: lightblue;
+                            color: #333;
                         }
-                        td {
-                            background-color: #ffffff;
+                        table.tabel-user td {
+                            background-color: #f7f7f7;
+                        }
+                        table.tabel-user tr:nth-child(even) td {
+                            background-color: #e6f2ff;
+                        }
+                        /* Kolom khusus: batasi lebar */
+                        table.tabel-user td:nth-child(1),  /* NIK */
+                        table.tabel-user td:nth-child(2),  /* Plat */
+                        table.tabel-user td:nth-child(5),  /* Jumlah */
+                        table.tabel-user td:nth-child(7),  /* No_HP */
+                        table.tabel-user td:nth-child(8),  /* Alamat */
+                        table.tabel-user td:nth-child(9)   /* Jasa_Pengiriman */
+                        {
+                            max-width: 120px;
+                            white-space: normal;
                         }
                     </style>
                     """
 
                     # Tampilkan tabel
-                    st.markdown(tabel_style + html_table, unsafe_allow_html=True)
-
+                    st.markdown(tabel_style, unsafe_allow_html=True)
+                    st.markdown(html_table, unsafe_allow_html=True)
+                    
                     # =========================
                     # 🔄 Status Pengiriman
                     # =========================
@@ -831,19 +871,26 @@ def dashboard_page():
                             box-shadow: 0 4px 8px rgba(0,0,0,0.1);
                             font-family: 'Arial', sans-serif;
                         }
+
+                        /* Tambahkan border */
                         .status-table {
                             width: 100%;
                             border-collapse: collapse;
+                            border: 1px solid #999;  /* Tambahkan border ke seluruh tabel */
                         }
+
                         .status-table td {
                             padding: 6px 4px;
                             vertical-align: top;
                             font-size: 16px;
+                            border: 1px solid #999;  /* Garis untuk tiap sel */
                         }
+
                         .status-table td.label {
                             font-weight: bold;
                             width: 180px;
                         }
+
                         .status-tag {
                             color: white;
                             padding: 4px 10px;
@@ -852,6 +899,7 @@ def dashboard_page():
                         }
                         </style>
                         """, unsafe_allow_html=True)
+
 
                         for _, row in df_pengguna_pengiriman.sort_values("Tanggal_Bayar", ascending=False).iterrows():
                             status = row["Status_Pengiriman"]

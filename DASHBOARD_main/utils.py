@@ -3,7 +3,10 @@ import streamlit as st
 import pandas as pd
 import random
 from fpdf import FPDF
-import datetime
+from datetime import datetime, timedelta, timezone
+
+# Set zona waktu WIB (Waktu Indonesia Barat)
+wib = timezone(timedelta(hours=7))
 
 # Path utama
 BASE_PATH = os.path.dirname(os.path.abspath(__file__))
@@ -130,7 +133,7 @@ def buat_status_pengiriman(nik, plat, ekspedisi):
     """
     nomor_resi = f"RESI{random.randint(100000, 999999)}"
     status = "Diproses"
-    tanggal_bayar = datetime.datetime.now().strftime("%d-%m-%Y %H:%M")
+    tanggal_bayar = datetime.now(wib).strftime("%d-%m-%Y %H:%M")
 
     df_kendaraan = load_data("kendaraan")
     df_pengiriman = load_data("pengiriman")
@@ -193,7 +196,7 @@ def buat_pdf_resi(nik, nama, plat, ekspedisi, nomor_resi, alamat):
         ("Jasa Pengiriman", ekspedisi),
         ("Nomor Resi", nomor_resi),
         ("Alamat Tujuan", alamat),
-        ("Tanggal Cetak", datetime.datetime.now().strftime("%d-%m-%Y %H:%M"))
+        ("Tanggal Cetak", datetime.now(wib).strftime("%d-%m-%Y %H:%M")) 
     ]
 
     for label, value in data:
