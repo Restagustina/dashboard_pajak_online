@@ -1,9 +1,9 @@
 import streamlit as st
 import pandas as pd
-from datetime import timedelta, timezone
+from datetime import timedelta, timezone, date
 import os
 import base64
-from utils import load_data, load_all_data, save_data, update_status_lunas, buat_status_pengiriman, buat_pdf_resi
+from utils import load_data, load_all_data, save_data, update_status_lunas, buat_status_pengiriman, buat_pdf_resi, cek_jatuh_tempo_dekat
 from streamlit.components.v1 import html
 import calendar
 import plotly.express as px
@@ -531,6 +531,10 @@ def dashboard_page():
         df_riwayat = load_data("riwayat")
         df_user = df_riwayat[df_riwayat["NIK"] == nik]
 
+        # Konversi Jumlah ke float
+        df_user["Jumlah"] = pd.to_numeric(df_user["Jumlah"], errors="coerce")
+        df_user = df_user.dropna(subset=["Jumlah"])
+
         if df_user.empty:
             st.markdown(
                 """
@@ -586,8 +590,9 @@ def dashboard_page():
             """, unsafe_allow_html=True)
 
             # Visualisasi Data
-            with st.expander("📊 Statistik"):
-                # ========= Bar Chart: Pembayaran per Bulan =========
+            with st.expander("📊 KLIK DISINI"):
+
+                # Persiapan data
                 df_user["Bulan"] = df_user["Tanggal_Bayar"].dt.strftime('%B')
                 bayar_per_bulan = df_user.groupby("Bulan")["Jumlah"].sum().reset_index()
                 bayar_per_bulan["Bulan"] = pd.Categorical(
@@ -595,27 +600,96 @@ def dashboard_page():
                 )
                 bayar_per_bulan = bayar_per_bulan.sort_values("Bulan")
 
-                st.subheader("📅 Total Pembayaran per Bulan")
-                st.bar_chart(bayar_per_bulan.set_index("Bulan"))
-
-                # ========= Line Chart: Tren Pembayaran =========
                 df_user_sorted = df_user.sort_values("Tanggal_Bayar")
                 df_trend = df_user_sorted.groupby("Tanggal_Bayar")["Jumlah"].sum().reset_index()
 
-                st.subheader("📈 Tren Pembayaran Pajak")
-                st.line_chart(df_trend.rename(columns={"Tanggal_Bayar": "Tanggal"}).set_index("Tanggal"))
-
-                # ========= Histogram: Distribusi Jumlah Pembayaran =========
-                st.subheader("🔢 Histogram Jumlah Pembayaran")
-                fig_hist = px.histogram(df_user, x="Jumlah", nbins=10, title="Distribusi Jumlah Pembayaran")
-                st.plotly_chart(fig_hist, use_container_width=True)
-
-                # ========= Pie Chart: Metode Pembayaran =========
-                st.subheader("🥧 Distribusi Metode Pembayaran")
                 metode_counts = df_user["Metode"].value_counts().reset_index()
                 metode_counts.columns = ["Metode", "Jumlah"]
-                fig_pie = px.pie(metode_counts, names="Metode", values="Jumlah", title="Metode Pembayaran yang Digunakan")
-                st.plotly_chart(fig_pie, use_container_width=True)
+
+                # Layout 2 kolom atas
+                col1, col2 = st.columns(2)
+
+                with col1:
+                    st.markdown("**Total Pembayaran per Bulan**")
+                    fig_bar = px.bar(bayar_per_bulan, x="Bulan", y="Jumlah")
+                    fig_bar.update_layout(
+                        yaxis_tickformat=',',
+                        height=350,
+                        margin=dict(l=20, r=20, t=30, b=20),
+                        plot_bgcolor='lightgray',
+                        paper_bgcolor='white',
+                        font=dict(color='black'),
+                        xaxis=dict(title_font=dict(color='black'), tickfont=dict(color='black')),
+                        yaxis=dict(title_font=dict(color='black'), tickfont=dict(color='black')),
+                    )
+                    st.plotly_chart(fig_bar, use_container_width=True)
+
+                with col2:
+                    st.markdown("**Tren Pembayaran Pajak**")
+                    
+                    df_trend_renamed = df_trend.rename(columns={"Tanggal_Bayar": "Tanggal"})
+
+                    fig_line = px.line(
+                        df_trend_renamed,
+                        x="Tanggal",
+                        y=df_trend_renamed.columns[1],  # asumsinya kolom kedua adalah jumlah pembayaran
+                    )
+
+                    fig_line.update_layout(
+                        height=350,
+                        plot_bgcolor='lightgray',
+                        paper_bgcolor='white',
+                        font=dict(color='black'),
+                        xaxis=dict(title="Tanggal", title_font=dict(color='black'), tickfont=dict(color='black')),
+                        yaxis=dict(title="Jumlah", title_font=dict(color='black'), tickfont=dict(color='black')),
+                        margin=dict(l=20, r=20, t=30, b=20)
+                    )
+
+                    st.plotly_chart(fig_line, use_container_width=True)
+
+
+                # Layout 2 kolom bawah
+                col3, col4 = st.columns(2)
+
+                with col3:
+                    st.markdown("**Histogram Jumlah Pembayaran**")
+                    fig_hist = px.histogram(df_user, x="Jumlah", nbins=10)
+                    fig_hist.update_layout(
+                        title=dict(
+                            text="Distribusi Jumlah Pembayaran",
+                            x=0.5,
+                            xanchor='center',
+                            font=dict(size=16)
+                        ),
+                        height=350,
+                        plot_bgcolor='lightgray',
+                        paper_bgcolor='white',
+                        font=dict(color='black'),
+                        xaxis=dict(title_font=dict(color='black'), tickfont=dict(color='black')),
+                        yaxis=dict(title_font=dict(color='black'), tickfont=dict(color='black')),
+                        margin=dict(l=20, r=20, t=40, b=20)
+                    )
+                    st.plotly_chart(fig_hist, use_container_width=True)
+
+                with col4:
+                    st.markdown("**Distribusi Metode Pembayaran**")
+                    fig_pie = px.pie(metode_counts, names="Metode", values="Jumlah")
+                    fig_pie.update_layout(
+                        height=350,
+                        plot_bgcolor='lightgray',
+                        paper_bgcolor='white',
+                        font=dict(color='black'),
+                        margin=dict(l=40, r=20, t=30, b=10),
+                        legend=dict(
+                            orientation="h",
+                            yanchor="bottom",
+                            y=-5,
+                            xanchor="center",
+                            x=0.5,
+                            font=dict(color='black')
+                        )
+                    )
+                    st.plotly_chart(fig_pie, use_container_width=True)
 
     # Halaman Bayar Pajak
     elif menu == "💳 Bayar Pajak": 
