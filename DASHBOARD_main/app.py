@@ -37,8 +37,6 @@ if query_params.get("daftar", [""])[0].lower() == "true":
 # -------------------------------
 def set_background(image_path=None, color=None):
     css = ""
-    
-    # Jika menggunakan gambar
     if image_path:
         if not os.path.exists(image_path):
             st.warning("Gambar background tidak ditemukan.")
@@ -208,7 +206,7 @@ def login_page():
     </div>
     """, unsafe_allow_html=True)
 
-    # Tombol "Registrasi Now" (streamlit button terlihat seperti link)
+    # Tombol "Registrasi Now"
     col1, col2, col3 = st.columns([3, 2, 3])
     with col2:
         if st.button("Registrasi Now", key="register_now"):
@@ -322,7 +320,7 @@ def register_page():
 
         if st.button("🔐 Kembali ke Halaman Login", use_container_width=True, key="back_to_login_from_register"):
             st.session_state.page = "login"
-            st.query_params.clear() # hapus query param ?daftar=true
+            st.query_params.clear() 
             st.rerun()
         st.markdown("</div>", unsafe_allow_html=True)
 
