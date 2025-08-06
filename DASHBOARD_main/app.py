@@ -6,7 +6,7 @@ import pandas as pd
 from datetime import timedelta, timezone, date
 import os
 import base64
-from utils import load_data, load_all_data, save_data, update_status_lunas, buat_status_pengiriman, buat_pdf_resi, hitung_jatuh_tempo
+from .utils import load_data, load_all_data, save_data, update_status_lunas, buat_status_pengiriman, buat_pdf_resi, hitung_jatuh_tempo
 import streamlit.components.v1 as components
 from streamlit.components.v1 import html
 import calendar
