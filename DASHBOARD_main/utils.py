@@ -27,6 +27,7 @@ wib = timezone(timedelta(hours=7))
 # FUNGSI LOAD DATA
 # ============================
 @st.cache_data(ttl=1)  # Tambahkan ttl agar cache cepat refresh 1 detik
+supabase = get_supabase()
 def load_data(data_type):
     """
     Load data tertentu dari Supabase berdasarkan data_type.
