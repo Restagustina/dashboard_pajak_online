@@ -10,12 +10,15 @@ from datetime import datetime, timedelta, timezone
 from supabase import create_client, Client
 
 # ============================
-# INISIALISASI SUPABASE
+# FUNGSI GET SUPABASE CLIENT
 # ============================
-SUPABASE_URL = "https://vyhdnlzjmzoatchtihgj.supabase.co"  # Ganti sesuai proyekmu
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ5aGRubHpqbXpvYXRjaHRpaGdqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ0NzE4ODAsImV4cCI6MjA3MDA0Nzg4MH0.HUBVYVPAMCwHITtMwGYx_9_t9drkVPhtRatwU30CjSo"
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-
+def get_supabase() -> Client:
+    url = os.environ.get("SUPABASE_URL", "https://vyhdnlzjmzoatchtihgj.supabase.co")  # fallback ke default
+    key = os.environ.get("SUPABASE_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ5aGRubHpqbXpvYXRjaHRpaGdqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ0NzE4ODAsImV4cCI6MjA3MDA0Nzg4MH0.HUBVYVPAMCwHITtMwGYx_9_t9drkVPhtRatwU30CjSo")
+    
+    if not url or not key:
+        raise ValueError("SUPABASE_URL and SUPABASE_KEY must be set.")
+    return create_client(url, key)
 
 # Set zona waktu WIB (Waktu Indonesia Barat)
 wib = timezone(timedelta(hours=7))
