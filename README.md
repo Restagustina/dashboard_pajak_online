@@ -2,12 +2,12 @@
 Proyek ini adalah aplikasi web berbasis Python + Streamlit untuk mempermudah pembayaran pajak kendaraan secara daring.
 
 ## 🚀 Fitur Utama
-- ✅ Registrasi dan Login berbasis NIK & Plat Nomor
-- 📄 Profil kendaraan & Info Pajak
-- 💳 Simulasi Pembayaran (BRI, Mandiri, DANA, dll)
-- 📜 Riwayat Pembayaran
-- 🚚 Status Pengiriman Dokumen
-- 🧠 Analisis Sentimen Komentar Publik terhadap SIGNAL menggunakan IndoBERT
+- Registrasi dan Login berbasis NIK & Plat Nomor
+- Profil kendaraan & Info Pajak
+- Dashboard tentang pajak user
+- Simulasi Pembayaran (BRI, Mandiri, DANA, dll)
+- Riwayat Pembayaran
+- Status Pengiriman Dokumen
 
 ## 🗂️ Struktur Folder
 ├── DASHBOARD_main/ # Folder utama aplikasi Streamlit
