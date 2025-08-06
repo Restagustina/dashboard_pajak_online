@@ -170,7 +170,7 @@ def buat_status_pengiriman(nik, plat, ekspedisi):
     return nomor_resi
 
 def update_status_pengiriman_otomatis():
-    df = load_data("pengiriman")
+    df = load_datgit a("pengiriman")
 
     now = pd.Timestamp.now()
 
