@@ -532,8 +532,7 @@ def dashboard_page():
             }}
             </style>
         """
-        components.html(html_content, height=1000)
-
+        components.html(html_content, height=1000, width=None, scrolling=True)
 
     # Halaman Statistik Pajak User
     elif menu == "Dashboard":
