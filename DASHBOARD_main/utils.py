@@ -82,7 +82,7 @@ def save_data(new_user, new_kendaraan):
     """
     os.makedirs(DATA_FOLDER, exist_ok=True)
 
-    df_user, df_kendaraan, _ = load_all_data()
+    df_user, df_kendaraan, *_ = load_all_data()
 
     # Tambah dan hindari duplikat berdasarkan NIK dan Plat
     df_user = pd.concat([df_user, new_user], ignore_index=True)
