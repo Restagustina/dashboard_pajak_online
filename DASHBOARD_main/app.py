@@ -6,12 +6,11 @@ import pandas as pd
 from datetime import timedelta, timezone, date
 import os
 import base64
-from utils import load_data, load_all_data, save_data, update_status_lunas, buat_status_pengiriman, buat_pdf_resi, hitung_jatuh_tempo
+from utils import load_data, load_all_data, save_data, update_status_lunas, buat_status_pengiriman, buat_pdf_resi, hitung_jatuh_tempo, get_supabase
 import streamlit.components.v1 as components
 from streamlit.components.v1 import html
 import calendar
 import plotly.express as px
-import openpyxl
 
 # ============================
 # INISIALISASI SESSION STATE
@@ -155,22 +154,22 @@ def login_page():
 
         # Cek apakah NIK & Password valid dari df_user
         user_match = df_user[
-            (df_user["NIK"] == input_nik) &
-            (df_user["Password"] == input_password)
+            (df_user["nik"] == input_nik) &
+            (df_user["password"] == input_password)
         ]
         
         # Cek apakah Plat cocok dengan NIK dari df_kendaraan
         kendaraan_match = df_kendaraan[
-            (df_kendaraan["Plat"].str.upper() == input_plat) &
-            (df_kendaraan["NIK"] == input_nik)
+            (df_kendaraan["plat"].str.upper() == input_plat) &
+            (df_kendaraan["nik"] == input_nik)
          ]
         if not user_match.empty and not kendaraan_match.empty:
             st.session_state.user_data = {
                 'NIK': input_nik,
                 'Plat': input_plat,
-                'Nama': user_match.iloc[0].get('Nama', ''),
-                'Alamat': kendaraan_match.iloc[0].get('Alamat', ''),
-                'Pajak': kendaraan_match.iloc[0].get('Pajak', '')
+                'Nama': user_match.iloc[0].get('nama', ''),
+                'Alamat': kendaraan_match.iloc[0].get('alamat', ''),
+                'Pajak': kendaraan_match.iloc[0].get('pajak', '')
             }
             st.session_state.page = 'dashboard'
             st.rerun()
@@ -283,11 +282,11 @@ def register_page():
                 st.error("❌ NIK harus terdiri dari 16 digit angka.")
                 return
 
-            if nik in df_user['NIK'].values:
+            if nik in df_user['nik'].values:
                 st.error("❌ NIK sudah terdaftar. Silakan login atau gunakan NIK lain.")
                 return
 
-            if plat in df_kendaraan['Plat'].values:
+            if plat in df_kendaraan['plat'].values:
                 st.error("❌ Plat kendaraan sudah terdaftar.")
                 return
 
@@ -313,7 +312,9 @@ def register_page():
                 "Pajak": pajak
             }])
 
-            save_data(new_user, new_kendaraan)
+            # Simpan ke Supabase
+            insert_user(nik, plat, nama, password)
+            insert_kendaraan(nik, nama, alamat, plat, norangka, merek, model, warna, pajak, tanggal_jatuh_tempo)
 
             # Tampilkan halaman sukses
             st.session_state.registration_success = True
@@ -831,9 +832,10 @@ def dashboard_page():
                             "Jasa_Pengiriman": jasa
                             }])
 
-                        # Simpan riwayat pembayaran
-                        df_riwayat = pd.concat([df_riwayat, new_row], ignore_index=True)
-                        df_riwayat.to_excel("DASHBOARD_main/riwayat_pembayaran.xlsx", index=False)
+                        # Simpan riwayat pembayaran ke Supabase
+                        for _, row in new_row.iterrows():
+                            supabase.table("riwayat").insert(row.to_dict()).execute()
+
 
                         # Update status pembayaran jadi Lunas
                         update_status_lunas(nik, plat)
@@ -910,8 +912,8 @@ def dashboard_page():
 
             st.subheader("📜 Riwayat Pembayaran") 
             try:
-                df_riwayat = pd.read_excel("DASHBOARD_main/riwayat_pembayaran.xlsx", dtype={"NIK": str})
-                df_user = df_riwayat[df_riwayat["NIK"] == nik]
+                response = supabase.table("riwayat_pembayaran").select("*").eq("NIK", nik).execute()
+                df_user = pd.DataFrame(response.data)
 
                 if not df_user.empty:
                     st.markdown("""
@@ -930,6 +932,7 @@ def dashboard_page():
 
                     # html_table = df_user.to_html(index=False, escape=False)
                     html_table = df_user.to_html(index=False, escape=False, classes="tabel-user")
+                    st.markdown(html_table, unsafe_allow_html=True)
 
                     # Styling CSS
                     tabel_style = """
@@ -977,8 +980,8 @@ def dashboard_page():
                     st.markdown(html_table, unsafe_allow_html=True)
                     
                     # Status Pengiriman
-                    df_pengiriman = pd.read_excel("DASHBOARD_main/status_pengiriman.xlsx", dtype={"NIK": str})
-                    df_pengguna_pengiriman = df_pengiriman[(df_pengiriman["NIK"] == nik)]
+                    response = supabase.table("status_pengiriman").select("*").eq("NIK", nik).execute()
+                    df_pengguna_pengiriman = pd.DataFrame(response.data)
 
                     if not df_pengguna_pengiriman.empty:
                         st.markdown("### 📦 Status Pengiriman Dokumen")

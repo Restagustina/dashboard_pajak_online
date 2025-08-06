@@ -7,73 +7,51 @@ import pandas as pd
 import random
 from fpdf import FPDF
 from datetime import datetime, timedelta, timezone
+from supabase import create_client, Client
+
+# ============================
+# INISIALISASI SUPABASE
+# ============================
+SUPABASE_URL = "https://vyhdnlzjmzoatchtihgj.supabase.co"  # Ganti sesuai proyekmu
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ5aGRubHpqbXpvYXRjaHRpaGdqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ0NzE4ODAsImV4cCI6MjA3MDA0Nzg4MH0.HUBVYVPAMCwHITtMwGYx_9_t9drkVPhtRatwU30CjSo"
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+
 
 # Set zona waktu WIB (Waktu Indonesia Barat)
 wib = timezone(timedelta(hours=7))
 
 # ============================
-# PENENTUAN PATH LOKASI FILE EXCEL
-# ============================
-BASE_PATH = os.path.dirname(os.path.abspath(__file__))
-DATA_FOLDER = BASE_PATH  # sudah di dalam folder DASHBOARD_main
-
-# Path ke file Excel
-PATH_USER = os.path.join(DATA_FOLDER, "data_user.xlsx")
-PATH_KENDARAAN = os.path.join(DATA_FOLDER, "data_kendaraan.xlsx")
-PATH_RIWAYAT = os.path.join(DATA_FOLDER, "riwayat_pembayaran.xlsx")
-PATH_STATUS = os.path.join(DATA_FOLDER, "status_pengiriman.xlsx")
-
-# Debug path
-print("BASE_PATH:", BASE_PATH)
-print("PATH_USER:", PATH_USER)
-print("PATH_KENDARAAN:", PATH_KENDARAAN)
-print("PATH_RIWAYAT:", PATH_RIWAYAT)
-
-# ============================
-# FUNGSI LOAD DATA BERDASARKAN JENIS
+# FUNGSI LOAD DATA
 # ============================
 @st.cache_data(ttl=1)  # Tambahkan ttl agar cache cepat refresh 1 detik
 def load_data(data_type):
     """
-    Load data tertentu ('user', 'kendaraan', atau 'riwayat') dari file Excel.
+    Load data tertentu dari Supabase berdasarkan data_type.
     Return 1 DataFrame sesuai permintaan.
     """
-    if data_type == "user":
-        if os.path.exists(PATH_USER):
-            return pd.read_excel(PATH_USER, dtype=str).fillna("").applymap(str.strip)
-        else:
-            return pd.DataFrame(columns=["NIK", "Plat", "Nama", "Password"])
+    mapping = {
+        "user": ("users", ["nik", "plat", "nama", "password"]),
+        "kendaraan": ("kendaraan", [
+            "nik", "plat", "nama", "alamat", "pajak_terhutang",
+            "tanggal_jatuh_tempo", "pajak", "nomor_rangka", "merek", "model", "warna"
+        ]),
+        "riwayat": ("riwayat_pembayaran", [
+            "nik", "plat", "nama", "tanggal_bayar", "jumlah", "metode"
+        ]),
+        "pengiriman": ("status_pengiriman", [
+            "nik", "plat", "nama", "alamat", "tanggal_pengiriman",
+            "ekspedisi", "no_resi", "status", "estimasi_terkirim"
+        ]),
+    }
 
-    elif data_type == "kendaraan":
-        if os.path.exists(PATH_KENDARAAN):
-            return pd.read_excel(PATH_KENDARAAN, dtype=str).fillna("").applymap(str.strip)
-        else:
-            return pd.DataFrame(columns=[
-                "NIK", "Plat", "Nama", "Alamat", "Pajak_Terhutang",
-                "Tanggal_Jatuh_Tempo", "Pajak", "Nomor_Rangka", "Merek", "Model", "Warna"
-            ])
-
-    elif data_type == "riwayat":
-        if os.path.exists(PATH_RIWAYAT):
-            return pd.read_excel(PATH_RIWAYAT, dtype=str).fillna("").applymap(str.strip)
-        else:
-            return pd.DataFrame(columns=[
-                "NIK", "Plat", "Nama", "Tanggal_Bayar", "Jumlah", "Metode"
-            ])
-        
-    elif data_type == "pengiriman":
-        if os.path.exists(PATH_STATUS):
-            return pd.read_excel(PATH_STATUS, dtype=str).fillna("").applymap(str.strip)
-        else:
-            df_kosong = pd.DataFrame(columns=[
-                "NIK", "Plat", "Nama", "Alamat", "Tanggal Pengiriman",
-                "Ekspedisi", "Nomor Resi", "Status", "Estimasi Terkirim"
-            ])
-            df_kosong.to_excel(PATH_STATUS, index=False)
-            return df_kosong
-
-    else:
+    if data_type not in mapping:
         raise ValueError(f"Tipe data tidak dikenal: {data_type}")
+
+    table_name, columns = mapping[data_type]
+    response = supabase.table(table_name).select("*").execute()
+    data = response.data
+
+    return pd.DataFrame(data) if data else pd.DataFrame(columns=columns)
 
 # ============================
 # FUNGSI LOAD SEMUA DATA
@@ -83,40 +61,37 @@ def load_all_data():
         load_data("user"),
         load_data("kendaraan"),
         load_data("riwayat"),
-        load_data("pengiriman") 
+        load_data("pengiriman")
     )
 
 # ============================
 # FUNGSI SIMPAN DATA USER & KENDARAAN
 # ============================
-def save_data(new_user, new_kendaraan):
+def save_data(new_user_df, new_kendaraan_df):
     """
-    Simpan data user dan kendaraan baru ke file Excel.
+    Simpan data user dan kendaraan baru ke Supabase.
     Hindari duplikat berdasarkan NIK (user) dan Plat (kendaraan).
     """
-    os.makedirs(DATA_FOLDER, exist_ok=True)
 
+    # Ambil data eksisting
     df_user, df_kendaraan, *_ = load_all_data()
 
-    df_user = pd.concat([df_user, new_user], ignore_index=True)
-    df_user = df_user.drop_duplicates(subset=["NIK"], keep="last")
+    # Gabungkan dan hapus duplikat berdasarkan NIK
+    df_user = pd.concat([df_user, new_user_df], ignore_index=True)
+    df_user = df_user.drop_duplicates(subset=["nik"], keep="last")
 
-    df_kendaraan = pd.concat([df_kendaraan, new_kendaraan], ignore_index=True)
-    df_kendaraan = df_kendaraan.drop_duplicates(subset=["Plat"], keep="last")
+    # Gabungkan dan hapus duplikat berdasarkan Plat
+    df_kendaraan = pd.concat([df_kendaraan, new_kendaraan_df], ignore_index=True)
+    df_kendaraan = df_kendaraan.drop_duplicates(subset=["plat"], keep="last")
 
-    # Simpan ulang
-    df_user.to_excel(PATH_USER, index=False)
-    df_kendaraan.to_excel(PATH_KENDARAAN, index=False)
+    # Hapus seluruh data lama dan ganti dengan data baru (opsi aman untuk demo/dev)
+    supabase.table("users").delete().neq("nik", "").execute()
+    supabase.table("kendaraan").delete().neq("plat", "").execute()
 
-    # Buat riwayat pembayaran
-    if not os.path.exists(PATH_RIWAYAT):
-        df_riwayat = pd.DataFrame(columns=[
-            "NIK", "Plat", "Nama", "Tanggal_Bayar", "Jumlah", "Metode",
-            "Nama_Penerima", "No_HP", "Alamat", "Jasa_Pengiriman"
-        ])
-        df_riwayat.to_excel(PATH_RIWAYAT, index=False)
+    supabase.table("users").insert(df_user.to_dict(orient="records")).execute()
+    supabase.table("kendaraan").insert(df_kendaraan.to_dict(orient="records")).execute()
 
-    # Hapus cache agar bisa dibaca ulang
+    # Bersihkan cache
     st.cache_data.clear()
 
 # ============================
@@ -124,21 +99,13 @@ def save_data(new_user, new_kendaraan):
 # ============================
 def update_status_lunas(nik, plat):
     """
-    Update status kendaraan menjadi 'LUNAS' setelah pembayaran.
+    Update status kendaraan menjadi 'LUNAS' di Supabase setelah pembayaran.
     """
-    if not os.path.exists(PATH_KENDARAAN):
-         return
+    supabase.table("kendaraan").update({"status": "LUNAS"}).match({
+        "nik": nik,
+        "plat": plat
+    }).execute()
 
-    df_kendaraan = pd.read_excel(PATH_KENDARAAN, dtype=str).fillna("").applymap(str.strip)
-
-    # Tambahkan kolom 'Status' jika belum ada
-    if 'Status' not in df_kendaraan.columns:
-        df_kendaraan['Status'] = ''
-
-    mask = (df_kendaraan['NIK'] == nik) & (df_kendaraan['Plat'] == plat)
-    df_kendaraan.loc[mask, 'Status'] = 'LUNAS'
-
-    df_kendaraan.to_excel(PATH_KENDARAAN, index=False)
     st.cache_data.clear()
 
 # ============================
@@ -146,8 +113,7 @@ def update_status_lunas(nik, plat):
 # ============================
 def buat_status_pengiriman(nik, plat, ekspedisi):
     """
-    Simulasi pembuatan status pengiriman dan nomor resi.
-    Data disimpan ke status_pengiriman.xlsx.
+    Buat entri baru status pengiriman di Supabase.
     """
     nomor_resi = f"RESI{random.randint(100000, 999999)}"
     status = "Diproses"
@@ -155,56 +121,73 @@ def buat_status_pengiriman(nik, plat, ekspedisi):
     estimasi_terkirim = (datetime.now(wib) + timedelta(days=2)).strftime("%d-%m-%Y %H:%M")
 
     df_kendaraan = load_data("kendaraan")
-    df_pengiriman = load_data("pengiriman")
 
-    # Cari informasi pengguna
-    kendaraan = df_kendaraan[(df_kendaraan["NIK"] == nik) & (df_kendaraan["Plat"] == plat)]
+    # Cari kendaraan berdasarkan NIK dan Plat
+    kendaraan = df_kendaraan[(df_kendaraan["nik"] == nik) & (df_kendaraan["plat"] == plat)]
     if kendaraan.empty:
         return None  # Tidak ditemukan
 
     row = kendaraan.iloc[0]
 
-    data_baru = pd.DataFrame([{
-        "NIK": nik,
-        "Plat": plat,
-        "Nama": row["Nama"],
-        "Alamat": row["Alamat"],
-        "Tanggal Pengiriman": tanggal_pengiriman,
-        "Ekspedisi": ekspedisi,
-        "Nomor Resi": nomor_resi,
-        "Status": status,
-        "Estimasi Terkirim": estimasi_terkirim,
-        "Tanggal_Bayar": tanggal_pengiriman,  
-        "No_Resi": nomor_resi,                 
-        "Status_Pengiriman": status 
-    }])
+    # Siapkan data untuk disimpan
+    data_baru = {
+        "nik": nik,
+        "plat": plat,
+        "nama": row["nama"],
+        "alamat": row["alamat"],
+        "tanggal_pengiriman": tanggal_pengiriman,
+        "ekspedisi": ekspedisi,
+        "no_resi": nomor_resi,
+        "status_pengiriman": status,
+        "estimasi_terkirim": estimasi_terkirim
+    }
 
-    # Gabungkan dan hapus duplikat berdasarkan NIK + Plat
-    df_pengiriman = pd.concat([df_pengiriman, data_baru], ignore_index=True)
-    df_pengiriman.drop_duplicates(subset=["NIK", "Plat"], keep="last", inplace=True)
+    # Hapus data lama (jika ada) berdasarkan nik & plat
+    supabase.table("status_pengiriman").delete().match({
+        "nik": nik,
+        "plat": plat
+    }).execute()
 
-    # Simpan
-    df_pengiriman.to_excel(PATH_STATUS, index=False)
+    # Insert data baru
+    supabase.table("status_pengiriman").insert(data_baru).execute()
+    st.cache_data.clear()
+
     return nomor_resi
 
 # ============================
 # FUNGSI UPDATE STATUS PENGIRIMAN OTOMATIS
 # ============================
 def update_status_pengiriman_otomatis():
+    """
+    Update otomatis status pengiriman menjadi 'Terkirim' jika sudah lewat 2 hari dari tanggal_pengiriman.
+    """
     df = load_data("pengiriman")
-    now = pd.Timestamp.now()
+    now = pd.Timestamp.now(tz=wib)
 
-    if "Status" in df.columns and "Tanggal Pengiriman" in df.columns:
-        for i, row in df.iterrows():
-            if row["Status"] == "Diproses":
-                    try:
-                        tanggal_bayar = pd.to_datetime(row["Tanggal_Bayar"], format="%d-%m-%Y %H:%M", errors='coerce')
-                        if pd.notnull(tanggal_bayar) and (now - tanggal_bayar).days >= 2:
-                            df.at[i, "Status_Pengiriman"] = "Terkirim"
-                    except:
-                        continue
+    updates = []
+    for _, row in df.iterrows():
+        if row.get("status_pengiriman") == "Diproses":
+            try:
+                tanggal_kirim = pd.to_datetime(row.get("tanggal_pengiriman"), format="%d-%m-%Y %H:%M", errors='coerce')
+                if pd.notnull(tanggal_kirim) and (now - tanggal_kirim).days >= 2:
+                    updates.append({
+                        "nik": row["nik"],
+                        "plat": row["plat"],
+                        "status_pengiriman": "Terkirim"
+                    })
+            except:
+                continue
 
-    df.to_excel(PATH_STATUS, index=False)
+    # Lakukan update di Supabase
+    for u in updates:
+        supabase.table("status_pengiriman").update({
+            "status_pengiriman": u["status_pengiriman"]
+        }).match({
+            "nik": u["nik"],
+            "plat": u["plat"]
+        }).execute()
+
+    st.cache_data.clear()
 
 # ============================
 # FUNGSI CETAK PDF RESI PENGIRIMAN
