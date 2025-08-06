@@ -1,3 +1,6 @@
+# ============================
+# IMPORT DAN INISIALISASI
+# ============================
 import os
 import streamlit as st
 import pandas as pd
@@ -8,7 +11,9 @@ from datetime import datetime, timedelta, timezone
 # Set zona waktu WIB (Waktu Indonesia Barat)
 wib = timezone(timedelta(hours=7))
 
-# Path utama
+# ============================
+# PENENTUAN PATH LOKASI FILE EXCEL
+# ============================
 BASE_PATH = os.path.dirname(os.path.abspath(__file__))
 DATA_FOLDER = BASE_PATH  # sudah di dalam folder DASHBOARD_main
 
@@ -24,6 +29,9 @@ print("PATH_USER:", PATH_USER)
 print("PATH_KENDARAAN:", PATH_KENDARAAN)
 print("PATH_RIWAYAT:", PATH_RIWAYAT)
 
+# ============================
+# FUNGSI LOAD DATA BERDASARKAN JENIS
+# ============================
 @st.cache_data(ttl=1)  # Tambahkan ttl agar cache cepat refresh 1 detik
 def load_data(data_type):
     """
@@ -67,6 +75,9 @@ def load_data(data_type):
     else:
         raise ValueError(f"Tipe data tidak dikenal: {data_type}")
 
+# ============================
+# FUNGSI LOAD SEMUA DATA
+# ============================
 def load_all_data():
     return (
         load_data("user"),
@@ -75,6 +86,9 @@ def load_all_data():
         load_data("pengiriman") 
     )
 
+# ============================
+# FUNGSI SIMPAN DATA USER & KENDARAAN
+# ============================
 def save_data(new_user, new_kendaraan):
     """
     Simpan data user dan kendaraan baru ke file Excel.
@@ -84,7 +98,6 @@ def save_data(new_user, new_kendaraan):
 
     df_user, df_kendaraan, *_ = load_all_data()
 
-    # Tambah dan hindari duplikat berdasarkan NIK dan Plat
     df_user = pd.concat([df_user, new_user], ignore_index=True)
     df_user = df_user.drop_duplicates(subset=["NIK"], keep="last")
 
@@ -106,7 +119,9 @@ def save_data(new_user, new_kendaraan):
     # Hapus cache agar bisa dibaca ulang
     st.cache_data.clear()
 
-
+# ============================
+# FUNGSI UPDATE STATUS LUNAS SETELAH PEMBAYARAN
+# ============================
 def update_status_lunas(nik, plat):
     """
     Update status kendaraan menjadi 'LUNAS' setelah pembayaran.
@@ -126,6 +141,9 @@ def update_status_lunas(nik, plat):
     df_kendaraan.to_excel(PATH_KENDARAAN, index=False)
     st.cache_data.clear()
 
+# ============================
+# FUNGSI BUAT STATUS PENGIRIMAN BARU
+# ============================
 def buat_status_pengiriman(nik, plat, ekspedisi):
     """
     Simulasi pembuatan status pengiriman dan nomor resi.
@@ -156,8 +174,8 @@ def buat_status_pengiriman(nik, plat, ekspedisi):
         "Nomor Resi": nomor_resi,
         "Status": status,
         "Estimasi Terkirim": estimasi_terkirim,
-        "Tanggal_Bayar": tanggal_pengiriman,  # boleh ditambah kalau kamu butuh historinya
-        "No_Resi": nomor_resi,                 # boleh ditambah juga jika bagian lain butuh
+        "Tanggal_Bayar": tanggal_pengiriman,  
+        "No_Resi": nomor_resi,                 
         "Status_Pengiriman": status 
     }])
 
@@ -169,9 +187,11 @@ def buat_status_pengiriman(nik, plat, ekspedisi):
     df_pengiriman.to_excel(PATH_STATUS, index=False)
     return nomor_resi
 
+# ============================
+# FUNGSI UPDATE STATUS PENGIRIMAN OTOMATIS
+# ============================
 def update_status_pengiriman_otomatis():
-    df = load_datgit a("pengiriman")
-
+    df = load_data("pengiriman")
     now = pd.Timestamp.now()
 
     if "Status" in df.columns and "Tanggal Pengiriman" in df.columns:
@@ -184,8 +204,11 @@ def update_status_pengiriman_otomatis():
                     except:
                         continue
 
-            df.to_excel(PATH_STATUS, index=False)
+    df.to_excel(PATH_STATUS, index=False)
 
+# ============================
+# FUNGSI CETAK PDF RESI PENGIRIMAN
+# ============================
 def buat_pdf_resi(nik, nama, plat, ekspedisi, nomor_resi, alamat):
     pdf = FPDF()
     pdf.add_page()

@@ -1,3 +1,6 @@
+# ============================
+# IMPORT LIBRARY
+# ============================
 import streamlit as st
 import pandas as pd
 from datetime import timedelta, timezone, date
@@ -9,9 +12,9 @@ from streamlit.components.v1 import html
 import calendar
 import plotly.express as px
 
-# -------------------------------
-# SESSION STATE & QUERY PARAM DETECTION
-# -------------------------------
+# ============================
+# INISIALISASI SESSION STATE
+# ============================
 if 'page' not in st.session_state:
     st.session_state.page = 'login'
 if 'user_data' not in st.session_state:
@@ -23,19 +26,18 @@ if 'registration_success' not in st.session_state:
 if 'login' not in st.session_state:
     st.session_state.login = False
 
-
-# -------------------------------
+# ============================
 # DETEKSI ?daftar=true
-# -------------------------------
+# ============================
 query_params = st.query_params
 if query_params.get("daftar", [""])[0].lower() == "true":
     st.session_state.page = "register"
     st.query_params.clear()  # hapus param biar tidak rerun terus
     st.rerun()
 
-# -------------------------------
+# ============================
 # SET BACKGROUND
-# -------------------------------
+# ============================
 def set_background(image_path=None, color=None):
     css = ""
     if image_path:
@@ -64,7 +66,7 @@ def set_background(image_path=None, color=None):
         </style>
         """
     
-    # Jika menggunakan warna saja (untuk dashboard)
+    # menggunakan warna (untuk dashboard)
     elif color:
         css = f"""
         <style>
@@ -84,26 +86,27 @@ def set_background(image_path=None, color=None):
     if css:
         st.markdown(css, unsafe_allow_html=True)
 
-# -------------------------------
+# ============================
 # KONFIGURASI AWAL
-# -------------------------------
+# ============================
 BASE_PATH = os.path.dirname(os.path.abspath(__file__))
 image_path = os.path.join(BASE_PATH, "assets", "bg.jpg")
 
-# -------------------------------
-# LOAD DATA
-# -------------------------------
+# ============================
+# LOAD SELURUH DATA SEKALI JALAN
+# ============================
 df_user, df_kendaraan, df_riwayat, df_pengiriman = load_all_data()
 
-# -------------------------------
+# ============================
 # LOGIN PAGE
-# -------------------------------
+# ============================
 def login_page():
     set_background("DASHBOARD_main/assets/bg.jpg") #background
     if st.session_state.get("registration_success", False):
         st.success("✅ Akun berhasil didaftarkan. Silakan login.")
         st.session_state.registration_success = False  # reset setelah ditampilkan
-
+    
+    # Judul & Subjudul
     st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Anton&display=swap');
@@ -207,7 +210,7 @@ def login_page():
     </div>
     """, unsafe_allow_html=True)
 
-    # Tombol "Registrasi Now"
+    # Tombol "Registrasi Now" : col1 dan col3 sengaja dikosongkan agar col2 (yang berisi tombol) tampil di tengah
     col1, col2, col3 = st.columns([3, 2, 3])
     with col2:
         if st.button("Registrasi Now", key="register_now"):
@@ -222,11 +225,12 @@ def login_page():
             st.session_state.page = "login"
             st.rerun()
 
-# -------------------------------
+# ============================
 # REGISTER PAGE
-# -------------------------------
+# ============================
 def register_page():
     set_background("DASHBOARD_main/assets/bg.jpg")
+    # Tampilan judul halaman dengan font khusus dan efek gradasi
     st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap');
@@ -246,9 +250,11 @@ def register_page():
     <div class='judul'>Daftar Akun Baru</div>
     """, unsafe_allow_html=True)
 
+    # Pastikan state 'registration_success' sudah ada
     if 'registration_success' not in st.session_state:
         st.session_state.registration_success = False
-
+    
+    # Formulir Registrasi
     if not st.session_state.registration_success:
         with st.form("register_form"):
             nik = st.text_input("Masukkan NIK").strip()
@@ -260,14 +266,14 @@ def register_page():
             model = st.text_input("Model Kendaraan (contoh: Sepeda Motor)")
             warna = st.selectbox("Warna Kendaraan", ["Hitam", "Putih", "Merah", "Biru", "Abu-abu", "Kuning"])
             pajak = st.number_input("Masukkan Jumlah Pajak (Rp)", min_value=0)
-            default_tempo = date.today() + timedelta(days=365)
+            default_tempo = date.today() + timedelta(days=365) # Default tanggal jatuh tempo 1 tahun dari sekarang
             tanggal_jatuh_tempo = st.date_input("Masukkan Tanggal Jatuh Tempo", value=default_tempo)
             password = st.text_input("Buat Password", type="password", help="Gunakan huruf besar, huruf kecil, angka, dan minimal 6 karakter.")
             
             submit = st.form_submit_button("Daftar")
 
+        # Validasi Form
         if submit:
-            # Validasi input
             if not nik or not nama or not alamat or not plat or pajak <= 0:
                 st.error("❌ Harap lengkapi semua data dengan benar.")
                 return
@@ -284,13 +290,13 @@ def register_page():
                 st.error("❌ Plat kendaraan sudah terdaftar.")
                 return
 
-            # Validasi password (minimal 6 karakter, huruf besar, huruf kecil, angka)
+            # Validasi password dengan regex (huruf besar, kecil, angka, min 6 karakter)
             import re
             if not re.match(r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{6,}$', password):
                 st.error("❌ Password harus mengandung huruf besar, huruf kecil, angka, dan minimal 6 karakter.")
                 return
 
-            # Simpan data
+            # Simpan Data Baru
             new_user = pd.DataFrame([{"NIK": nik, "Plat": plat, "Nama": nama, "Password": password}])
             new_kendaraan = pd.DataFrame([{
                 "NIK": nik,
@@ -312,9 +318,7 @@ def register_page():
             st.session_state.registration_success = True
             st.rerun()
 
-    # ---------------------
     # Jika sukses daftar
-    # ---------------------
     else:
         st.markdown("<div style='text-align: center;'>", unsafe_allow_html=True)
         st.success("✅ Akun berhasil didaftarkan. Silakan login.")
@@ -325,15 +329,16 @@ def register_page():
             st.rerun()
         st.markdown("</div>", unsafe_allow_html=True)
 
-# -------------------------------
+# ============================
 # DASHBOARD PAGE
-# -------------------------------
+# ============================
 def dashboard_page():
+    # Cek apakah user sudah login
     if not st.session_state.user_data:
         st.error("Anda belum login.")
         return
 
-    # Styling
+    # Styling global halaman dashboard
     st.markdown("""
     <style>
     /* Warna teks utama jadi hitam */
@@ -370,28 +375,6 @@ def dashboard_page():
         margin-top: 2rem;
         margin-bottom: 2rem;
     }
-
-    /* Chip status */
-    .chip {
-        display: inline-block;
-        padding: 4px 10px;
-        margin-left: 10px;
-        border-radius: 20px;
-        font-size: 12px;
-        font-weight: 600;
-        color: white;
-    }
-    .chip.aktif {
-        background-color: #4caf50;
-    }
-    .chip.menunggu {
-        background-color: #ffc107;
-        color: #000;
-    }
-    .chip.jatuh-tempo {
-        background-color: #2196f3;
-    }
-
     h1, h2 {
         margin-bottom: 1rem;
     }
@@ -402,7 +385,7 @@ def dashboard_page():
     user = st.session_state.user_data
     nama, nik, plat, alamat = user.get('Nama', ''), user.get('NIK', ''), user.get('Plat', ''), user.get('Alamat', '')
 
-    # Header
+    # Header utama: Judul Aplikasi
     st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Anton&display=swap');
@@ -992,9 +975,7 @@ def dashboard_page():
                     st.markdown(tabel_style, unsafe_allow_html=True)
                     st.markdown(html_table, unsafe_allow_html=True)
                     
-                    # =========================
-                    # 🔄 Status Pengiriman
-                    # =========================
+                    # Status Pengiriman
                     df_pengiriman = pd.read_excel("DASHBOARD_main/status_pengiriman.xlsx", dtype={"NIK": str})
                     df_pengguna_pengiriman = df_pengiriman[(df_pengiriman["NIK"] == nik)]
 
@@ -1095,14 +1076,13 @@ def dashboard_page():
         st.session_state.page = "login"
         st.rerun()
 
-
     # Footer
     st.markdown("<hr>", unsafe_allow_html=True)
     st.markdown("<center><small>© 2025 SIMANPA Samsat Palembang I</small></center>", unsafe_allow_html=True)
 
-# -------------------------------
+# ============================
 # ROUTING HALAMAN
-# -------------------------------
+# ============================
 if st.session_state.page == "login":
     login_page()
 elif st.session_state.page == "register":
