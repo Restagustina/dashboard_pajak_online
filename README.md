@@ -34,7 +34,7 @@ Proyek ini adalah aplikasi web berbasis Python + Streamlit untuk mempermudah pem
 
 ## Deploy
 Aplikasi ini dapat diakses melalui:
-👉 [streamlit.io](https://share.streamlit.io/) *(Link disesuaikan)*
+👉 [streamlit.io](https://dashboardpajakonline-npapp95tg4xndqgpjgops5g.streamlit.app/) 
 
 ## Developer
 Resta Gustina  
