@@ -291,7 +291,7 @@ def register_page():
                 return
 
             # Simpan data
-            new_user = pd.DataFrame([{"NIK": nik, "Nama": nama, "Password": password}])
+            new_user = pd.DataFrame([{"NIK": nik, "Plat": plat, "Nama": nama, "Password": password}])
             new_kendaraan = pd.DataFrame([{
                 "NIK": nik,
                 "Nama": nama,

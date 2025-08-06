@@ -133,7 +133,8 @@ def buat_status_pengiriman(nik, plat, ekspedisi):
     """
     nomor_resi = f"RESI{random.randint(100000, 999999)}"
     status = "Diproses"
-    tanggal_bayar = datetime.now(wib).strftime("%d-%m-%Y %H:%M")
+    tanggal_pengiriman = datetime.now(wib).strftime("%d-%m-%Y %H:%M")
+    estimasi_terkirim = (datetime.now(wib) + timedelta(days=2)).strftime("%d-%m-%Y %H:%M")
 
     df_kendaraan = load_data("kendaraan")
     df_pengiriman = load_data("pengiriman")
@@ -150,10 +151,14 @@ def buat_status_pengiriman(nik, plat, ekspedisi):
         "Plat": plat,
         "Nama": row["Nama"],
         "Alamat": row["Alamat"],
-        "Tanggal_Bayar": tanggal_bayar,
+        "Tanggal Pengiriman": tanggal_pengiriman,
         "Ekspedisi": ekspedisi,
-        "No_Resi": nomor_resi,
-        "Status_Pengiriman": status
+        "Nomor Resi": nomor_resi,
+        "Status": status,
+        "Estimasi Terkirim": estimasi_terkirim,
+        "Tanggal_Bayar": tanggal_pengiriman,  # boleh ditambah kalau kamu butuh historinya
+        "No_Resi": nomor_resi,                 # boleh ditambah juga jika bagian lain butuh
+        "Status_Pengiriman": status 
     }])
 
     # Gabungkan dan hapus duplikat berdasarkan NIK + Plat
@@ -169,17 +174,17 @@ def update_status_pengiriman_otomatis():
 
     now = pd.Timestamp.now()
 
-    if "Status_Pengiriman" in df.columns and "Tanggal_Bayar" in df.columns:
+    if "Status" in df.columns and "Tanggal Pengiriman" in df.columns:
         for i, row in df.iterrows():
-            if row["Status_Pengiriman"] == "Diproses":
-                try:
-                    tanggal_bayar = pd.to_datetime(row["Tanggal_Bayar"], format="%d-%m-%Y %H:%M", errors='coerce')
-                    if pd.notnull(tanggal_bayar) and (now - tanggal_bayar).days >= 2:
-                        df.at[i, "Status_Pengiriman"] = "Terkirim"
-                except:
-                    continue
+            if row["Status"] == "Diproses":
+                    try:
+                        tanggal_bayar = pd.to_datetime(row["Tanggal_Bayar"], format="%d-%m-%Y %H:%M", errors='coerce')
+                        if pd.notnull(tanggal_bayar) and (now - tanggal_bayar).days >= 2:
+                            df.at[i, "Status_Pengiriman"] = "Terkirim"
+                    except:
+                        continue
 
-        df.to_excel(PATH_STATUS, index=False)
+            df.to_excel(PATH_STATUS, index=False)
 
 def buat_pdf_resi(nik, nama, plat, ekspedisi, nomor_resi, alamat):
     pdf = FPDF()
