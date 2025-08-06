@@ -500,14 +500,25 @@ def dashboard_page():
             </div>
 
             <style>
+            html, body {{
+                margin: 0;
+                padding: 0;
+                width: 100%;
+                height: 100%;
+                overflow-x: hidden;
+                box-sizing: border-box;
+            }}
+
             .profile-container {{
                 background-color: white;
                 padding: 2rem 2.5rem;
                 border-radius: 18px;
-                max-width: 750px;
+                width: 100%;
+                max-width: 900px;
                 margin: auto;
                 box-shadow: 0 6px 18px rgba(0, 0, 0, 0.1);
                 font-family: 'Segoe UI', sans-serif;
+                box-sizing: border-box;
             }}
             .profile-title {{
                 font-size: 1.8rem;
@@ -532,7 +543,7 @@ def dashboard_page():
             }}
             </style>
         """
-        components.html(html_content, height=1000, width=None, scrolling=True)
+        components.html(html_content, height=1000, width=1000, scrolling=True)
 
     # Halaman Statistik Pajak User
     elif menu == "Dashboard":
