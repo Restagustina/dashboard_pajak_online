@@ -6,7 +6,7 @@ import pandas as pd
 from datetime import timedelta, timezone, date
 import os
 import base64
-from utils import load_data, load_all_data, save_data, update_status_lunas, buat_status_pengiriman, buat_pdf_resi, hitung_jatuh_tempo, get_supabase
+from utils import load_data, load_all_data, update_status_lunas, buat_status_pengiriman, buat_pdf_resi, hitung_jatuh_tempo, insert_user, insert_kendaraan, supabase
 import streamlit.components.v1 as components
 from streamlit.components.v1 import html
 import calendar
@@ -254,6 +254,8 @@ def register_page():
     if 'registration_success' not in st.session_state:
         st.session_state.registration_success = False
     
+    df_user = load_data("user")
+    df_kendaraan = load_data("kendaraan")
     # Formulir Registrasi
     if not st.session_state.registration_success:
         with st.form("register_form"):
@@ -296,25 +298,21 @@ def register_page():
                 st.error("❌ Password harus mengandung huruf besar, huruf kecil, angka, dan minimal 6 karakter.")
                 return
 
-            # Simpan Data Baru
-            new_user = pd.DataFrame([{"NIK": nik, "Plat": plat, "Nama": nama, "Password": password}])
-            new_kendaraan = pd.DataFrame([{
-                "NIK": nik,
-                "Nama": nama,
-                "Alamat": alamat,
-                "Plat": plat,
-                "Nomor_Rangka": norangka,
-                "Merek": merek,
-                "Model": model,
-                "Warna": warna,
-                "Pajak_Terhutang": pajak,
-                "Tanggal_Jatuh_Tempo": tanggal_jatuh_tempo,
-                "Pajak": pajak
-            }])
-
             # Simpan ke Supabase
             insert_user(nik, plat, nama, password)
-            insert_kendaraan(nik, nama, alamat, plat, norangka, merek, model, warna, pajak, tanggal_jatuh_tempo)
+            insert_kendaraan(
+                nik=nik,
+                plat=plat,
+                nama=nama,
+                alamat=alamat,
+                pajak_terhutang=pajak,
+                tanggal_jatuh_tempo=tanggal_jatuh_tempo.strftime("%Y-%m-%d"),  # pastikan format tanggal string
+                pajak=pajak,
+                nomor_rangka=norangka,
+                merek=merek,
+                model=model,
+                warna=warna
+            )
 
             # Tampilkan halaman sukses
             st.session_state.registration_success = True

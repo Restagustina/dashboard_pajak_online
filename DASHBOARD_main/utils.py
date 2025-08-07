@@ -9,16 +9,9 @@ from fpdf import FPDF
 from datetime import datetime, timedelta, timezone
 from supabase import create_client, Client
 
-# ============================
-# FUNGSI GET SUPABASE CLIENT
-# ============================
-def get_supabase() -> Client:
-    url = os.environ.get("SUPABASE_URL", "https://vyhdnlzjmzoatchtihgj.supabase.co")  # fallback ke default
-    key = os.environ.get("SUPABASE_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ5aGRubHpqbXpvYXRjaHRpaGdqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ0NzE4ODAsImV4cCI6MjA3MDA0Nzg4MH0.HUBVYVPAMCwHITtMwGYx_9_t9drkVPhtRatwU30CjSo")
-    
-    if not url or not key:
-        raise ValueError("SUPABASE_URL and SUPABASE_KEY must be set.")
-    return create_client(url, key)
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://vyhdnlzjmzoatchtihgj.supabase.co") 
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ5aGRubHpqbXpvYXRjaHRpaGdqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ0NzE4ODAsImV4cCI6MjA3MDA0Nzg4MH0.HUBVYVPAMCwHITtMwGYx_9_t9drkVPhtRatwU30CjSo")
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # Set zona waktu WIB (Waktu Indonesia Barat)
 wib = timezone(timedelta(hours=7))
@@ -27,7 +20,6 @@ wib = timezone(timedelta(hours=7))
 # FUNGSI LOAD DATA
 # ============================
 @st.cache_data(ttl=1)  # Tambahkan ttl agar cache cepat refresh 1 detik
-supabase = get_supabase()
 def load_data(data_type):
     """
     Load data tertentu dari Supabase berdasarkan data_type.
@@ -44,7 +36,7 @@ def load_data(data_type):
         ]),
         "pengiriman": ("status_pengiriman", [
             "nik", "plat", "nama", "alamat", "tanggal_pengiriman",
-            "ekspedisi", "no_resi", "status", "estimasi_terkirim"
+            "ekspedisi", "no_resi", "status_pengiriman", "estimasi_terkirim"
         ]),
     }
 
@@ -71,31 +63,17 @@ def load_all_data():
 # ============================
 # FUNGSI SIMPAN DATA USER & KENDARAAN
 # ============================
-def save_data(new_user_df, new_kendaraan_df):
-    """
-    Simpan data user dan kendaraan baru ke Supabase.
-    Hindari duplikat berdasarkan NIK (user) dan Plat (kendaraan).
-    """
+def insert_user(nik, plat, nama, password):
+    supabase.table("users").insert({
+        "nik": nik,
+        "plat": plat,
+        "nama": nama,
+        "password": password
+    }).execute()
+    st.cache_data.clear()
 
-    # Ambil data eksisting
-    df_user, df_kendaraan, *_ = load_all_data()
-
-    # Gabungkan dan hapus duplikat berdasarkan NIK
-    df_user = pd.concat([df_user, new_user_df], ignore_index=True)
-    df_user = df_user.drop_duplicates(subset=["nik"], keep="last")
-
-    # Gabungkan dan hapus duplikat berdasarkan Plat
-    df_kendaraan = pd.concat([df_kendaraan, new_kendaraan_df], ignore_index=True)
-    df_kendaraan = df_kendaraan.drop_duplicates(subset=["plat"], keep="last")
-
-    # Hapus seluruh data lama dan ganti dengan data baru (opsi aman untuk demo/dev)
-    supabase.table("users").delete().neq("nik", "").execute()
-    supabase.table("kendaraan").delete().neq("plat", "").execute()
-
-    supabase.table("users").insert(df_user.to_dict(orient="records")).execute()
-    supabase.table("kendaraan").insert(df_kendaraan.to_dict(orient="records")).execute()
-
-    # Bersihkan cache
+def insert_kendaraan(**kwargs):
+    supabase.table("kendaraan").insert(kwargs).execute()
     st.cache_data.clear()
 
 # ============================
@@ -231,8 +209,8 @@ def hitung_jatuh_tempo(riwayat_user):
         return None, None, None  # Belum pernah bayar
 
     # Ambil pembayaran terakhir
-    riwayat_user = riwayat_user.sort_values(by="Tanggal_Bayar", ascending=False)
-    terakhir_bayar = pd.to_datetime(riwayat_user.iloc[0]["Tanggal_Bayar"])
+    riwayat_user = riwayat_user.sort_values(by="tanggal_bayar", ascending=False)
+    terakhir_bayar = pd.to_datetime(riwayat_user.iloc[0]["tanggal_bayar"])
     jatuh_tempo = terakhir_bayar + timedelta(days=365)
     hari_tersisa = (jatuh_tempo - datetime.today()).days
 
