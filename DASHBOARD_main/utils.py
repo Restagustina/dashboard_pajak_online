@@ -28,8 +28,8 @@ def load_data(data_type):
     mapping = {
         "user": ("users", ["nik", "plat", "nama", "password"]),
         "kendaraan": ("kendaraan", [
-            "nik", "plat", "nama", "alamat", "pajak_terhutang",
-            "tanggal_jatuh_tempo", "pajak", "nomor_rangka", "merek", "model", "warna"
+            "nik", "plat", "nama", "alamat",
+            "tanggal_jatuh_tempo", "pajak", "norangka", "merek", "model", "warna"
         ]),
         "riwayat": ("riwayat_pembayaran", [
             "nik", "plat", "nama", "tanggal_bayar", "jumlah", "metode"

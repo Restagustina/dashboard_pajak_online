@@ -307,7 +307,6 @@ def register_page():
                 alamat=alamat,
                 pajak_terhutang=pajak,
                 tanggal_jatuh_tempo=tanggal_jatuh_tempo.strftime("%Y-%m-%d"),  # pastikan format tanggal string
-                pajak=pajak,
                 nomor_rangka=norangka,
                 merek=merek,
                 model=model,
