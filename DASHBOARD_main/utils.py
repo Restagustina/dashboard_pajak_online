@@ -1,13 +1,13 @@
 # ============================
 # IMPORT DAN INISIALISASI
 # ============================
-import os
-import streamlit as st
-import pandas as pd
-import random
-from fpdf import FPDF
+import os #Untuk os.environ.get() ambil env vars
+import streamlit as st 
+import pandas as pd #untuk DataFrame, manipulasi data Supabase
+import random # untuk generate no. resi
+from fpdf import FPDF 
 from datetime import datetime, timedelta, timezone
-from supabase import create_client, Client
+from supabase import create_client, Client #untuk konek ke Supabase
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://vyhdnlzjmzoatchtihgj.supabase.co") 
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ5aGRubHpqbXpvYXRjaHRpaGdqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ0NzE4ODAsImV4cCI6MjA3MDA0Nzg4MH0.HUBVYVPAMCwHITtMwGYx_9_t9drkVPhtRatwU30CjSo")
@@ -28,11 +28,10 @@ def load_data(data_type):
     mapping = {
         "user": ("users", ["nik", "plat", "nama", "password"]),
         "kendaraan": ("kendaraan", [
-            "nik", "plat", "nama", "alamat",
-            "tanggal_jatuh_tempo", "pajak", "norangka", "merek", "model", "warna"
+            "nik", "plat", "nama", "alamat", "tanggal_jatuh_tempo", "pajak", "norangka", "merek", "model", "warna"
         ]),
         "riwayat": ("riwayat_pembayaran", [
-            "nik", "plat", "nama", "tanggal_bayar", "jumlah", "metode"
+            "nik", "plat", "nama", "tanggal_bayar", "jumlah", "metode", "status"
         ]),
         "pengiriman": ("status_pengiriman", [
             "nik", "plat", "nama", "alamat", "tanggal_pengiriman",
@@ -59,36 +58,28 @@ def load_all_data():
         load_data("riwayat"),
         load_data("pengiriman")
     )
+    
+# ============================
+# FUNGSI CEK STATUS LUNAS BERDASARKAN PAJAK TERHUTANG USER
+# ============================
+def get_pajak_terhutang_by_plat(supabase, plat):
+    response = supabase.table("data_kendaraan").select("Plat", "Pajak_Terhutang").eq("Plat", plat).execute()
+    data = response.data
+    if data:
+        return data[0].get("Pajak_Terhutang", 0)
+    return 0  # default tidak ditemukan
 
 # ============================
-# FUNGSI SIMPAN DATA USER & KENDARAAN
+#UPDATE STATUS LUNAS
 # ============================
-def insert_user(nik, plat, nama, password):
-    supabase.table("users").insert({
-        "nik": nik,
-        "plat": plat,
-        "nama": nama,
-        "password": password
-    }).execute()
-    st.cache_data.clear()
-
-def insert_kendaraan(**kwargs):
-    supabase.table("kendaraan").insert(kwargs).execute()
-    st.cache_data.clear()
-
-# ============================
-# FUNGSI UPDATE STATUS LUNAS SETELAH PEMBAYARAN
-# ============================
-def update_status_lunas(nik, plat):
-    """
-    Update status kendaraan menjadi 'LUNAS' di Supabase setelah pembayaran.
-    """
-    supabase.table("kendaraan").update({"status": "LUNAS"}).match({
-        "nik": nik,
-        "plat": plat
-    }).execute()
-
-    st.cache_data.clear()
+def update_status_lunas(plat):
+    data_bayar = supabase.table("riwayat_pembayaran").select("*").eq("Plat", plat).execute()
+    if data_bayar.data:
+        latest = sorted(data_bayar.data, key=lambda x: x['Tanggal'], reverse=True)[0]
+        if latest["Status"] == "Belum Lunas":
+            supabase.table("riwayat_pembayaran").update({"Status": "Lunas"}).eq("id", latest["id"]).execute()
+            return True
+    return False
 
 # ============================
 # FUNGSI BUAT STATUS PENGIRIMAN BARU
@@ -215,3 +206,36 @@ def hitung_jatuh_tempo(riwayat_user):
     hari_tersisa = (jatuh_tempo - datetime.today()).days
 
     return terakhir_bayar.date(), jatuh_tempo.date(), hari_tersisa
+
+# ============================
+# FUNGSI INSERT USER
+# ============================
+def insert_user(nik, plat, nama, password):
+    supabase.table("users").insert({
+        "nik": nik,
+        "plat": plat,
+        "nama": nama,
+        "password": password
+    }).execute()
+    st.cache_data.clear()
+
+
+# ============================
+# FUNGSI INSERT KENDARAAN
+# ============================
+def insert_kendaraan(nik, plat, nama, alamat, pajak,
+                     tanggal_jatuh_tempo, norangka, merek, model, warna):
+    data = {
+        "nik": nik,
+        "plat": plat,
+        "nama": nama,
+        "alamat": alamat,
+        "pajak": pajak,
+        "tanggal_jatuh_tempo": tanggal_jatuh_tempo,
+        "norangka": norangka,
+        "merek": merek,
+        "model": model,
+        "warna": warna
+    }
+    supabase.table("kendaraan").insert(data).execute()
+    st.cache_data.clear()

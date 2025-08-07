@@ -3,10 +3,10 @@
 # ============================
 import streamlit as st
 import pandas as pd
-from datetime import timedelta, timezone, date
+from datetime import timedelta, timezone, date #manipulasi tanggal & waktu
 import os
-import base64
-from utils import load_data, load_all_data, update_status_lunas, buat_status_pengiriman, buat_pdf_resi, hitung_jatuh_tempo, insert_user, insert_kendaraan, supabase
+import base64 #untuk akses file dan encoding
+from utils import load_data, load_all_data, update_status_lunas, buat_status_pengiriman, buat_pdf_resi, hitung_jatuh_tempo, insert_user, insert_kendaraan, supabase, get_pajak_terhutang_by_plat
 import streamlit.components.v1 as components
 from streamlit.components.v1 import html
 import calendar
@@ -305,9 +305,9 @@ def register_page():
                 plat=plat,
                 nama=nama,
                 alamat=alamat,
-                pajak_terhutang=pajak,
-                tanggal_jatuh_tempo=tanggal_jatuh_tempo.strftime("%Y-%m-%d"),  # pastikan format tanggal string
-                nomor_rangka=norangka,
+                pajak=pajak,
+                tanggal_jatuh_tempo=tanggal_jatuh_tempo.strftime("%Y-%m-%d"),  
+                norangka=norangka,
                 merek=merek,
                 model=model,
                 warna=warna
@@ -441,13 +441,13 @@ def dashboard_page():
         """, unsafe_allow_html=True)
 
         df_kendaraan = load_data("kendaraan")
-        kendaraan = df_kendaraan[df_kendaraan['NIK'] == nik].iloc[0]
+        kendaraan = df_kendaraan[df_kendaraan['nik'] == nik].iloc[0]
 
-        norangka = kendaraan['Nomor_Rangka']
-        merek = kendaraan['Merek']
-        model = kendaraan['Model']
-        warna = kendaraan['Warna']
-        pajak = float(kendaraan['Pajak_Terhutang'])
+        norangka = kendaraan['norangka']
+        merek = kendaraan['merek']
+        model = kendaraan['model']
+        warna = kendaraan['warna']
+        pajak = float(kendaraan['pajak'])
 
         html_content = f"""
             <div class="profile-container">
@@ -541,11 +541,11 @@ def dashboard_page():
 
         # Filter riwayat berdasarkan NIK
         df_riwayat = load_data("riwayat")
-        df_user = df_riwayat[df_riwayat["NIK"] == nik]
+        df_user = df_riwayat[df_riwayat["nik"] == nik]
 
         # Konversi Jumlah ke float
-        df_user["Jumlah"] = pd.to_numeric(df_user["Jumlah"], errors="coerce")
-        df_user = df_user.dropna(subset=["Jumlah"])
+        df_user["jumlah"] = pd.to_numeric(df_user["jumlah"], errors="coerce")
+        df_user = df_user.dropna(subset=["jumlah"])
 
         if df_user.empty:
             st.markdown(
@@ -565,7 +565,7 @@ def dashboard_page():
 
         else:
             # Konversi tanggal
-            df_user["Tanggal_Bayar"] = pd.to_datetime(df_user["Tanggal_Bayar"], errors="coerce", dayfirst=True)
+            df_user["tanggal_bayar"] = pd.to_datetime(df_user["tanggal_bayar"], errors="coerce", dayfirst=True)
 
             # Hitung informasi jatuh tempo
             terakhir_bayar, jatuh_tempo, hari_tersisa = hitung_jatuh_tempo(df_user)
@@ -608,11 +608,11 @@ def dashboard_page():
 
                 
             # Total bayar
-            total_bayar = df_user["Jumlah"].astype(float).sum()
+            total_bayar = df_user["jumlah"].astype(float).sum()
             total_transaksi = df_user.shape[0]
 
             # Metode favorit
-            metode_fav = df_user["Metode"].mode()[0] if not df_user["Metode"].mode().empty else "-"
+            metode_fav = df_user["metode"].mode()[0] if not df_user["metode"].mode().empty else "-"
 
             # Card Ringkasan
             st.markdown("""
@@ -645,18 +645,18 @@ def dashboard_page():
             with st.expander("📊 KLIK DISINI"):
 
                 # Persiapan data
-                df_user["Bulan"] = df_user["Tanggal_Bayar"].dt.strftime('%B')
-                bayar_per_bulan = df_user.groupby("Bulan")["Jumlah"].sum().reset_index()
+                df_user["Bulan"] = df_user["tanggal_bayar"].dt.strftime('%B')
+                bayar_per_bulan = df_user.groupby("Bulan")["jumlah"].sum().reset_index()
                 bayar_per_bulan["Bulan"] = pd.Categorical(
                     bayar_per_bulan["Bulan"], categories=calendar.month_name[1:], ordered=True
                 )
                 bayar_per_bulan = bayar_per_bulan.sort_values("Bulan")
 
-                df_user_sorted = df_user.sort_values("Tanggal_Bayar")
-                df_trend = df_user_sorted.groupby("Tanggal_Bayar")["Jumlah"].sum().reset_index()
+                df_user_sorted = df_user.sort_values("tanggal_bayar")
+                df_trend = df_user_sorted.groupby("tanggal_bayar")["jumlah"].sum().reset_index()
 
-                metode_counts = df_user["Metode"].value_counts().reset_index()
-                metode_counts.columns = ["Metode", "Jumlah"]
+                metode_counts = df_user["metode"].value_counts().reset_index()
+                metode_counts.columns = ["metode", "jumlah"]
 
                 # Layout 2 kolom atas
                 col1, col2 = st.columns(2)
@@ -679,7 +679,7 @@ def dashboard_page():
                 with col2:
                     st.markdown("**Tren Pembayaran Pajak**")
                     
-                    df_trend_renamed = df_trend.rename(columns={"Tanggal_Bayar": "Tanggal"})
+                    df_trend_renamed = df_trend.rename(columns={"tanggal_bayar": "Tanggal"})
 
                     fig_line = px.line(
                         df_trend_renamed,
@@ -767,7 +767,13 @@ def dashboard_page():
 
         st.markdown('<div class="judul-bayar">Silakan selesaikan pembayaran pajak kendaraan Anda di bawah ini.</div>', unsafe_allow_html=True)
 
-        jumlah = st.number_input("Masukkan Jumlah Pembayaran", min_value=0, step=10000)
+        # Ambil data pajak_terhutang user dari Supabase
+        if not data_user.empty:
+            plat_user = data_user.iloc[0]["plat"]
+        pajak_terhutang = get_pajak_terhutang_by_plat(supabase, plat_user)
+
+        st.info(f"Pajak terhutang Anda: Rp {pajak_terhutang:,.0f}")
+        jumlah = st.number_input("Masukkan Jumlah Pembayaran", value=pajak_terhutang, step=10000)
         metode = st.selectbox("Pilih Metode Pembayaran", ["Bank Rakyat Indonesia (BRI)", "Bank Mandiri", "Bank Negara Indonesia (BNI)", "Bank Tabungan Negara (BTN)", "Bank Central Asia (BCA)", "Bank Syariah Indonesia (BSI)", "GoPay", "SeaBank"])
 
         # === Input Data Pengiriman Dokumen ===
@@ -810,29 +816,33 @@ def dashboard_page():
                     waktu = pd.Timestamp.now(wib).strftime("%d-%m-%Y %H:%M")
 
                     df_user, df_kendaraan, df_riwayat, df_pengiriman  = load_all_data()
-                    data_user = df_kendaraan[df_kendaraan["NIK"] == nik]
+                    data_user = df_kendaraan[df_kendaraan["nik"] == nik]
 
                     if not data_user.empty:
-                        nama = data_user.iloc[0]["Nama"]
-                        plat = data_user.iloc[0]["Plat"]
+                        nama = data_user.iloc[0]["nama"]
+                        plat = data_user.iloc[0]["plat"]
+
+                        # Cek status berdasarkan jumlah dan pajak_terhutang
+                        status_pembayaran = "LUNAS" if jumlah >= pajak_terhutang else "BELUM LUNAS"
+
 
                         new_row = pd.DataFrame([{
-                            "NIK": str(nik),
-                            "Plat": plat,
-                            "Nama": nama,
-                            "Tanggal_Bayar": waktu,
-                            "Jumlah": jumlah,
-                            "Metode": metode,
-                            "Nama_Penerima": nama_penerima,
-                            "No_HP": no_hp,
-                            "Alamat": alamat,
-                            "Jasa_Pengiriman": jasa
+                            "nik": str(nik),
+                            "plat": plat,
+                            "nama": nama,
+                            "tanggal_bayar": waktu,
+                            "jumlah": jumlah,
+                            "metode": metode,
+                            "nama_penerima": nama_penerima,
+                            "no_hp": no_hp,
+                            "alamat": alamat,
+                            "jasa_pengiriman": jasa,
+                            "status": status_pembayaran
                             }])
 
                         # Simpan riwayat pembayaran ke Supabase
                         for _, row in new_row.iterrows():
-                            supabase.table("riwayat").insert(row.to_dict()).execute()
-
+                            supabase.table("riwayat_pembayaran").insert(new_row.to_dict(orient="records")).execute()
 
                         # Update status pembayaran jadi Lunas
                         update_status_lunas(nik, plat)
@@ -873,7 +883,7 @@ def dashboard_page():
 
                         # Clear cache sebelum membaca ulang
                         st.cache_data.clear()
-                        df_riwayat = load_data("riwayat")
+                        df_riwayat = load_data("riwayat_pembayaran")
 
                         # Tampilkan notifikasi sukses
                         st.markdown(
@@ -909,7 +919,7 @@ def dashboard_page():
 
             st.subheader("📜 Riwayat Pembayaran") 
             try:
-                response = supabase.table("riwayat_pembayaran").select("*").eq("NIK", nik).execute()
+                response = supabase.table("riwayat_pembayaran").select("*").eq("nik", nik).execute()
                 df_user = pd.DataFrame(response.data)
 
                 if not df_user.empty:
@@ -977,7 +987,7 @@ def dashboard_page():
                     st.markdown(html_table, unsafe_allow_html=True)
                     
                     # Status Pengiriman
-                    response = supabase.table("status_pengiriman").select("*").eq("NIK", nik).execute()
+                    response = supabase.table("status_pengiriman").select("*").eq("nik", nik).execute()
                     df_pengguna_pengiriman = pd.DataFrame(response.data)
 
                     if not df_pengguna_pengiriman.empty:
@@ -1027,12 +1037,12 @@ def dashboard_page():
                         """, unsafe_allow_html=True)
 
 
-                        for _, row in df_pengguna_pengiriman.sort_values("Tanggal_Bayar", ascending=False).iterrows():
-                            status = row["Status_Pengiriman"]
-                            tanggal_kirim = row["Tanggal_Bayar"]
+                        for _, row in df_pengguna_pengiriman.sort_values("tanggal_bayar", ascending=False).iterrows():
+                            status = row["status_pengiriman"]
+                            tanggal_kirim = row["tanggal_bayar"]
                             estimasi = (pd.to_datetime(tanggal_kirim, format="%d-%m-%Y %H:%M") + pd.Timedelta(days=2)).strftime("%d-%m-%Y")
-                            resi = row["No_Resi"]
-                            ekspedisi = row["Ekspedisi"]
+                            resi = row["no_resi"]
+                            ekspedisi = row["ekspedisi"]
 
                             if status == "Terkirim":
                                 warna_status = "#28a745"  # hijau
