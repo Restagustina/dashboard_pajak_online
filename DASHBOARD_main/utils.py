@@ -12,15 +12,15 @@ from supabase import create_client, Client #untuk konek ke Supabase
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://vyhdnlzjmzoatchtihgj.supabase.co") 
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ5aGRubHpqbXpvYXRjaHRpaGdqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ0NzE4ODAsImV4cCI6MjA3MDA0Nzg4MH0.HUBVYVPAMCwHITtMwGYx_9_t9drkVPhtRatwU30CjSo")
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# Buat client Supabase dengan timeout lebih panjang
+# Buat httpx Client dengan timeout khusus
+httpx_client = httpx.Client(timeout=httpx.Timeout(60.0, connect=30.0))
+
+# Buat supabase client dengan httpx_client yang sudah di-set timeout-nya
 supabase: Client = create_client(
     SUPABASE_URL,
     SUPABASE_KEY,
-    client_options={
-        "timeout": httpx.Timeout(60.0, connect=30.0)
-    }
+    httpx_client=httpx_client
 )
 
 # Set zona waktu WIB (Waktu Indonesia Barat)
