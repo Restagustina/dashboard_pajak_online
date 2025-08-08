@@ -259,8 +259,8 @@ def register_page():
     # Formulir Registrasi
     if not st.session_state.registration_success:
         with st.form("register_form"):
-            nik = st.text_input("Masukkan NIK").strip()
-            nama = st.text_input("Masukkan Nama Lengkap").strip()
+            nik = st.text_input("Masukkan NIK (sesuai KTP)").strip()
+            nama = st.text_input("Masukkan Nama Lengkap (sesuai KTP)").strip()
             alamat = st.text_input("Masukkan Alamat").strip()
             plat = st.text_input("Masukkan Plat Kendaraan").strip().upper()
             norangka = st.text_input("Nomor Rangka Kendaraan")
@@ -808,7 +808,23 @@ def dashboard_page():
             no_hp = st.text_input("No. HP Penerima")
         with col2:
             jasa = st.selectbox("Jasa Pengiriman", ["JNE", "J&T", "Pos Indonesia", "SiCepat", "GO-SEND"])
-        alamat = st.text_area("Alamat Lengkap Tujuan")
+        # Baris 2: Alamat terbagi jadi 2 kolom input
+        st.markdown("**Alamat Lengkap Tujuan:**")
+        col3, col4 = st.columns(2)
+        with col3:
+            nama_jalan = st.text_input("Nama Jalan / Gang")
+        with col4:
+            nomor_rumah = st.text_input("Nomor Rumah / Blok")
+        col5, col6 = st.columns(2)
+        with col5:
+            rt_rw = st.text_input("RT / RW")
+        with col6:
+            kelurahan = st.text_input("Kelurahan")
+        col7, col8 = st.columns(2)
+        with col7:
+            kode_pos = st.text_input("Kode Pos (jika ada)")
+        with col8:
+            st.markdown("<br>", unsafe_allow_html=True)
 
         # Styling tombol Bayar Sekarang
         st.markdown("""
@@ -830,7 +846,7 @@ def dashboard_page():
         """, unsafe_allow_html=True)
 
         if st.button("Bayar Sekarang"):
-            if not nama_penerima or not no_hp or not alamat or not jasa:
+            if not nama_penerima or not no_hp or not nama_jalan or not nomor_rumah or not rt_rw or not kelurahan or not jasa:
                 st.warning("⚠️ Harap lengkapi semua data pengiriman dokumen sebelum membayar.")
             else:
                 try:
@@ -845,6 +861,8 @@ def dashboard_page():
                     # Cek status berdasarkan jumlah dan pajak_terhutang
                     status_pembayaran = "LUNAS" if float(jumlah) >= float(pajak) else "BELUM LUNAS"
 
+                    alamat_lengkap = f"{nama_jalan} No. {nomor_rumah}, RT/RW {rt_rw}, Kelurahan {kelurahan}, Kode Pos {kode_pos}"
+
                     new_row = pd.DataFrame([{
                         "nik": str(nik),
                         "plat": str(plat),
@@ -855,7 +873,7 @@ def dashboard_page():
                         "metode": str(metode),
                         "nama_penerima": str(nama_penerima),
                         "no_hp": str(no_hp),
-                        "alamat": str(alamat),
+                        "alamat": alamat_lengkap,
                         "jasa_pengiriman": str(jasa),
                         "status": str(status_pembayaran)
                     }])
@@ -875,7 +893,7 @@ def dashboard_page():
                     st.info(f"📦 Dokumen Anda akan dikirim via {jasa}.\n\nNomor Resi: `{resi}`")
 
                     # Menu Cetak Resi
-                    pdf_bytes = buat_pdf_resi(nik, nama, plat, jasa, resi, alamat)
+                    pdf_bytes = buat_pdf_resi(nik, nama, plat, jasa, resi, alamat_lengkap, jumlah)
 
                     # Custom CSS khusus untuk tombol download PDF
                     custom_button_css = """

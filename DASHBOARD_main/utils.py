@@ -185,7 +185,7 @@ def update_status_pengiriman_otomatis():
 # ============================
 # FUNGSI CETAK PDF RESI PENGIRIMAN
 # ============================
-def buat_pdf_resi(nik, nama, plat, ekspedisi, nomor_resi, alamat):
+def buat_pdf_resi(nik, nama, plat, ekspedisi, nomor_resi, alamat_lengkap, jumlah):
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Arial", size=12)
@@ -199,14 +199,21 @@ def buat_pdf_resi(nik, nama, plat, ekspedisi, nomor_resi, alamat):
         ("Plat Kendaraan", plat),
         ("Jasa Pengiriman", ekspedisi),
         ("Nomor Resi", nomor_resi),
-        ("Alamat Tujuan", alamat),
+        ("Alamat Tujuan", alamat_lengkap),
+        ("Nominal Pembayaran", f"Rp {jumlah:,.0f}"),
         ("Tanggal Cetak", datetime.now(wib).strftime("%d-%m-%Y %H:%M")) 
     ]
 
     for label, value in data:
-        pdf.cell(50, 10, txt=f"{label}", ln=0)
-        pdf.cell(100, 10, txt=f": {value}", ln=1)
-
+        for label, value in data:
+            if label == "Alamat Tujuan":
+                # Untuk alamat, buat multiline dengan indentasi setelah ": "
+                text = f"{label}: {value}"
+                pdf.multi_cell(0, 10, txt=text)
+            else:
+                # Untuk data biasa, buat label fixed width, lalu isi
+                pdf.cell(50, 10, txt=f"{label}", ln=0)
+                pdf.cell(0, 10, txt=f": {value}", ln=1)
     pdf.ln(10)
     pdf.cell(0, 10, txt="Terima kasih telah menggunakan layanan SIMANPA I.", ln=True)
 
