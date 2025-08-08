@@ -13,6 +13,15 @@ SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://vyhdnlzjmzoatchtihgj.supa
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ5aGRubHpqbXpvYXRjaHRpaGdqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ0NzE4ODAsImV4cCI6MjA3MDA0Nzg4MH0.HUBVYVPAMCwHITtMwGYx_9_t9drkVPhtRatwU30CjSo")
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
+# Buat client Supabase dengan timeout lebih panjang
+supabase: Client = create_client(
+    SUPABASE_URL,
+    SUPABASE_KEY,
+    client_options={
+        "timeout": httpx.Timeout(60.0, connect=30.0)
+    }
+)
+
 # Set zona waktu WIB (Waktu Indonesia Barat)
 wib = timezone(timedelta(hours=7))
 
