@@ -663,7 +663,7 @@ def dashboard_page():
 
                 with col1:
                     st.markdown("**Total Pembayaran per Bulan**")
-                    fig_bar = px.bar(bayar_per_bulan, x="Bulan", y="Jumlah")
+                    fig_bar = px.bar(bayar_per_bulan, x="Bulan", y="jumlah")
                     fig_bar.update_layout(
                         yaxis_tickformat=',',
                         height=350,
@@ -705,7 +705,7 @@ def dashboard_page():
 
                 with col3:
                     st.markdown("**Histogram Jumlah Pembayaran**")
-                    fig_hist = px.histogram(df_user, x="Jumlah", nbins=10)
+                    fig_hist = px.histogram(df_user, x="jumlah", nbins=10)
                     fig_hist.update_layout(
                         title=dict(
                             text="Distribusi Jumlah Pembayaran",
@@ -725,7 +725,7 @@ def dashboard_page():
 
                 with col4:
                     st.markdown("**Distribusi Metode Pembayaran**")
-                    fig_pie = px.pie(metode_counts, names="Metode", values="Jumlah")
+                    fig_pie = px.pie(metode_counts, names="metode", values="jumlah")
                     fig_pie.update_layout(
                         height=350,
                         plot_bgcolor='lightgray',
@@ -765,15 +765,38 @@ def dashboard_page():
         </style>
         """, unsafe_allow_html=True)
 
+        # Load data kendaraan dari Supabase
+        df_kendaraan = load_data("kendaraan")
+
         st.markdown('<div class="judul-bayar">Silakan selesaikan pembayaran pajak kendaraan Anda di bawah ini.</div>', unsafe_allow_html=True)
+
+        data_user = df_kendaraan[df_kendaraan["nik"] == nik]
 
         # Ambil data pajak_terhutang user dari Supabase
         if not data_user.empty:
-            plat_user = data_user.iloc[0]["plat"]
-        pajak_terhutang = get_pajak_terhutang_by_plat(supabase, plat_user)
+            plat = data_user.iloc[0]["plat"]
+            pajak = get_pajak_terhutang_by_plat(supabase, plat)
+        else:
+            st.warning("Data kendaraan tidak ditemukan.")
+            st.stop()
 
-        st.info(f"Pajak terhutang Anda: Rp {pajak_terhutang:,.0f}")
-        jumlah = st.number_input("Masukkan Jumlah Pembayaran", value=pajak_terhutang, step=10000)
+        st.markdown(
+            f"""
+            <div style="
+                background-color: gray;
+                padding: 15px;
+                border-radius: 8px;
+                font-size: 18px;
+                color: white;
+                text-align: left;
+            ">
+                Pajak terhutang Anda: Rp {pajak:,.0f}
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+        jumlah = st.number_input("Masukkan Jumlah Pembayaran", value=pajak, step=10000)
         metode = st.selectbox("Pilih Metode Pembayaran", ["Bank Rakyat Indonesia (BRI)", "Bank Mandiri", "Bank Negara Indonesia (BNI)", "Bank Tabungan Negara (BTN)", "Bank Central Asia (BCA)", "Bank Syariah Indonesia (BSI)", "GoPay", "SeaBank"])
 
         # === Input Data Pengiriman Dokumen ===
@@ -813,48 +836,49 @@ def dashboard_page():
                 try:
                     # Set zona waktu WIB (Waktu Indonesia Barat)
                     wib = timezone(timedelta(hours=7))
-                    waktu = pd.Timestamp.now(wib).strftime("%d-%m-%Y %H:%M")
+                    waktu_obj = pd.Timestamp.now(wib)
+                    waktu_str = waktu_obj.strftime("%d-%m-%Y %H:%M")   # Untuk tampilan
+                    waktu_iso = waktu_obj.isoformat()                  # Untuk database
 
-                    df_user, df_kendaraan, df_riwayat, df_pengiriman  = load_all_data()
-                    data_user = df_kendaraan[df_kendaraan["nik"] == nik]
+                    nama = data_user.iloc[0]["nama"]
 
-                    if not data_user.empty:
-                        nama = data_user.iloc[0]["nama"]
-                        plat = data_user.iloc[0]["plat"]
+                    # Cek status berdasarkan jumlah dan pajak_terhutang
+                    status_pembayaran = "LUNAS" if float(jumlah) >= float(pajak) else "BELUM LUNAS"
 
-                        # Cek status berdasarkan jumlah dan pajak_terhutang
-                        status_pembayaran = "LUNAS" if jumlah >= pajak_terhutang else "BELUM LUNAS"
+                    new_row = pd.DataFrame([{
+                        "nik": str(nik),
+                        "plat": str(plat),
+                        "nama": str(nama),
+                        "tanggal_bayar": waktu_iso,  # Simpan string ISO
+                        "created_at": waktu_iso, 
+                        "jumlah": float(jumlah),          # Pastikan float
+                        "metode": str(metode),
+                        "nama_penerima": str(nama_penerima),
+                        "no_hp": str(no_hp),
+                        "alamat": str(alamat),
+                        "jasa_pengiriman": str(jasa),
+                        "status": str(status_pembayaran)
+                    }])
 
+                    # Ubah semua kolom jadi Python native type
+                    clean_data = new_row.astype(object).where(pd.notnull(new_row), None)
 
-                        new_row = pd.DataFrame([{
-                            "nik": str(nik),
-                            "plat": plat,
-                            "nama": nama,
-                            "tanggal_bayar": waktu,
-                            "jumlah": jumlah,
-                            "metode": metode,
-                            "nama_penerima": nama_penerima,
-                            "no_hp": no_hp,
-                            "alamat": alamat,
-                            "jasa_pengiriman": jasa,
-                            "status": status_pembayaran
-                            }])
+                    # Simpan riwayat pembayaran ke Supabase
+                    supabase.table("riwayat_pembayaran").insert(
+                        clean_data.to_dict(orient="records")
+                    ).execute()
+                    # Update status pembayaran jadi Lunas
+                    update_status_lunas(plat)
 
-                        # Simpan riwayat pembayaran ke Supabase
-                        for _, row in new_row.iterrows():
-                            supabase.table("riwayat_pembayaran").insert(new_row.to_dict(orient="records")).execute()
+                    # Buat status pengiriman & nomor resi
+                    resi = buat_status_pengiriman(nik, plat, ekspedisi=jasa)
+                    st.info(f"📦 Dokumen Anda akan dikirim via {jasa}.\n\nNomor Resi: `{resi}`")
 
-                        # Update status pembayaran jadi Lunas
-                        update_status_lunas(nik, plat)
-                        # Buat status pengiriman & nomor resi
-                        resi = buat_status_pengiriman(nik, plat, ekspedisi=jasa)
-                        st.info(f"📦 Dokumen Anda akan dikirim via {jasa}.\n\nNomor Resi: `{resi}`")
+                    # Menu Cetak Resi
+                    pdf_bytes = buat_pdf_resi(nik, nama, plat, jasa, resi, alamat)
 
-                        # Menu Cetak Resi
-                        pdf_bytes = buat_pdf_resi(nik, nama, plat, jasa, resi, alamat)
-
-                        # Custom CSS khusus untuk tombol download PDF
-                        custom_button_css = """
+                    # Custom CSS khusus untuk tombol download PDF
+                    custom_button_css = """
                         <style>
                         div.stDownloadButton > button:first-child {
                             background-color: #4CAF50;
@@ -869,44 +893,41 @@ def dashboard_page():
                             background-color: #45a049;
                         }
                         </style>
-                        """
-                        st.markdown(custom_button_css, unsafe_allow_html=True)
+                    """
+                    st.markdown(custom_button_css, unsafe_allow_html=True)
 
-                        # Tombol Download PDF
-                        st.download_button(
-                            label="📄 Cetak Resi (PDF)",
-                            data=pdf_bytes,
-                            file_name=f"resi_{plat}_{resi}.pdf",
-                            mime="application/pdf"
-                        )
+                    # Tombol Download PDF
+                    st.download_button(
+                        label="📄 Cetak Resi (PDF)",
+                        data=pdf_bytes,
+                        file_name=f"resi_{plat}_{resi}.pdf",
+                        mime="application/pdf"
+                    )
 
+                    # Clear cache sebelum membaca ulang
+                    st.cache_data.clear()
+                    load_data("riwayat")
 
-                        # Clear cache sebelum membaca ulang
-                        st.cache_data.clear()
-                        df_riwayat = load_data("riwayat_pembayaran")
+                    # Tampilkan notifikasi sukses
+                    st.markdown(
+                        f"""
+                        <div style="
+                            background-color: #d4edda;
+                            padding: 10px;
+                            border-left: 6px solid #28a745;
+                            border-radius: 5px;
+                        ">
+                        <span style="color:#155724; font-weight:bold;">
+                            ✅ Pembayaran sebesar Rp{jumlah:,} via {metode} berhasil pada {waktu_str}.
+                        </span>
+                        </div>
+                        """,
+                        unsafe_allow_html=True
+                    )
 
-                        # Tampilkan notifikasi sukses
-                        st.markdown(
-                            f"""
-                            <div style="
-                                background-color: #d4edda;
-                                padding: 10px;
-                                border-left: 6px solid #28a745;
-                                border-radius: 5px;
-                            ">
-                                <span style="color:#155724; font-weight:bold;">
-                                    ✅ Pembayaran sebesar Rp{jumlah:,} via {metode} berhasil pada {waktu}.
-                                </span>
-                            </div>
-                            """,
-                            unsafe_allow_html=True
-                        )
-                        
-                    else:
-                        st.warning("⚠️ Data kendaraan tidak ditemukan.")
                 except Exception as e:
-                    st.error(f"Terjadi kesalahan saat menyimpan pembayaran: {e}")   
-
+                    st.error(f"Terjadi kesalahan saat menyimpan pembayaran: {e}")
+                    
     # Halaman Riwayat Pembayaran
     elif menu == "Riwayat Pembayaran": 
             st.markdown("""
@@ -921,8 +942,18 @@ def dashboard_page():
             try:
                 response = supabase.table("riwayat_pembayaran").select("*").eq("nik", nik).execute()
                 df_user = pd.DataFrame(response.data)
-
                 if not df_user.empty:
+                    # Hapus kolom 'id' dan 'created_at' agar tidak muncul di tabel
+                    cols_to_hide = ['id', 'created_at']
+                    df_display = df_user.drop(columns=[col for col in cols_to_hide if col in df_user.columns])
+
+                    # Lakukan formatting tanggal_bayar saja seperti sebelumnya
+                    if 'tanggal_bayar' in df_display.columns:
+                        try:
+                            dt = pd.to_datetime(df_display['tanggal_bayar'], errors='coerce', infer_datetime_format=True)
+                            df_display['tanggal_bayar'] = dt.dt.strftime("%d-%m-%Y %H:%M")
+                        except Exception as e:
+                            st.warning(f"Gagal parsing kolom tanggal_bayar: {e}")
                     st.markdown("""
                     <div style="
                         background-color: #d4edda;
@@ -938,8 +969,7 @@ def dashboard_page():
                     """, unsafe_allow_html=True)
 
                     # html_table = df_user.to_html(index=False, escape=False)
-                    html_table = df_user.to_html(index=False, escape=False, classes="tabel-user")
-                    st.markdown(html_table, unsafe_allow_html=True)
+                    html_table = df_display.to_html(index=False, escape=False, classes="tabel-user")
 
                     # Styling CSS
                     tabel_style = """
@@ -1037,46 +1067,62 @@ def dashboard_page():
                         """, unsafe_allow_html=True)
 
 
-                        for _, row in df_pengguna_pengiriman.sort_values("tanggal_bayar", ascending=False).iterrows():
-                            status = row["status_pengiriman"]
-                            tanggal_kirim = row["tanggal_bayar"]
-                            estimasi = (pd.to_datetime(tanggal_kirim, format="%d-%m-%Y %H:%M") + pd.Timedelta(days=2)).strftime("%d-%m-%Y")
-                            resi = row["no_resi"]
-                            ekspedisi = row["ekspedisi"]
+                        # Cek kolom tanggal yang ada
+                        if "tanggal_bayar" in df_pengguna_pengiriman.columns:
+                            tanggal_col = "tanggal_bayar"
+                        elif "tanggal_kirim" in df_pengguna_pengiriman.columns:
+                            tanggal_col = "tanggal_kirim"
+                        elif "created_at" in df_pengguna_pengiriman.columns:
+                            tanggal_col = "created_at"
+                        else:
+                            tanggal_col = None
 
-                            if status == "Terkirim":
-                                warna_status = "#28a745"  # hijau
-                            elif status == "Diproses":
-                                warna_status = "#ffc107"  # kuning
-                            else:
-                                warna_status = "#6c757d"  # abu
+                        if tanggal_col:
+                            for _, row in df_pengguna_pengiriman.sort_values(tanggal_col, ascending=False).iterrows():
+                                status = row.get("status_pengiriman", "-")
+                                tanggal_kirim_raw = row.get(tanggal_col, "-")
+                                try:
+                                    dt = pd.to_datetime(tanggal_kirim_raw, errors='raise', infer_datetime_format=True)
+                                    if dt.tz is None:
+                                        dt = dt.tz_localize("UTC")
+                                    dt = dt.tz_convert("Asia/Jakarta")
+                                    tanggal_kirim = dt.strftime("%d-%m-%Y %H:%M")
+                                except Exception:
+                                    tanggal_kirim = tanggal_kirim_raw
 
-                            st.markdown(f"""
-                            <div class="status-card">
-                                <table class="status-table">
-                                    <tr><td class="label">📦 Jasa Pengiriman</td><td>: {ekspedisi}</td></tr>
-                                    <tr><td class="label">🧾 Nomor Resi</td><td>: <code>{resi}</code></td></tr>
-                                    <tr><td class="label">📤 Tanggal Kirim</td><td>: {tanggal_kirim}</td></tr>
-                                    <tr><td class="label">📅 Estimasi Tiba</td><td>: {estimasi}</td></tr>
-                                    <tr><td class="label">📌 Status</td>
-                                        <td>: <span class="status-tag" style="background-color:{warna_status};">{status}</span></td></tr>
-                                </table>
-                            </div>
-                            """, unsafe_allow_html=True)
+                                try:
+                                    estimasi = (
+                                        pd.to_datetime(tanggal_kirim_raw)
+                                        .tz_convert("Asia/Jakarta")
+                                        + pd.Timedelta(days=2)
+                                    ).strftime("%d-%m-%Y")
+                                except Exception:
+                                    estimasi = "-"
 
-                else:
-                    st.markdown("""
-                    <div style="
-                        background-color: #fff3cd;
-                        padding: 1em;
-                        border-radius: 5px;
-                        color: #856404;
-                        border-left: 5px solid #ffc107;
-                        font-weight: 500;
-                    ">
-                    ⚠️ Belum ada riwayat pembayaran.
-                    </div>
-                    """, unsafe_allow_html=True)
+                                resi = row.get("no_resi", "-")
+                                ekspedisi = row.get("ekspedisi", "-")
+
+                                if status == "Terkirim":
+                                    warna_status = "#28a745"  # hijau
+                                elif status == "Diproses":
+                                    warna_status = "#ffc107"  # kuning
+                                else:
+                                    warna_status = "#6c757d"  # abu
+
+                                st.markdown(f"""
+                                <div class="status-card">
+                                    <table class="status-table">
+                                        <tr><td class="label">📦 Jasa Pengiriman</td><td>: {ekspedisi}</td></tr>
+                                        <tr><td class="label">🧾 Nomor Resi</td><td>: <code>{resi}</code></td></tr>
+                                        <tr><td class="label">📤 Tanggal Kirim</td><td>: {tanggal_kirim}</td></tr>
+                                        <tr><td class="label">📅 Estimasi Tiba</td><td>: {estimasi}</td></tr>
+                                        <tr><td class="label">📌 Status</td>
+                                            <td>: <span class="status-tag" style="background-color:{warna_status};">{status}</span></td></tr>
+                                    </table>
+                                </div>
+                                """, unsafe_allow_html=True)
+                        else:
+                            st.warning("⚠️ Data pengiriman tidak memiliki kolom tanggal.")
 
             except Exception as e:
                 st.error(f"Gagal membaca data riwayat: {e}")

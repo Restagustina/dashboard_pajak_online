@@ -19,7 +19,7 @@ wib = timezone(timedelta(hours=7))
 # ============================
 # FUNGSI LOAD DATA
 # ============================
-@st.cache_data(ttl=1)  # Tambahkan ttl agar cache cepat refresh 1 detik
+@st.cache_data(ttl=1)  # ttl agar cache cepat refresh 1 detik
 def load_data(data_type):
     """
     Load data tertentu dari Supabase berdasarkan data_type.
@@ -63,21 +63,31 @@ def load_all_data():
 # FUNGSI CEK STATUS LUNAS BERDASARKAN PAJAK TERHUTANG USER
 # ============================
 def get_pajak_terhutang_by_plat(supabase, plat):
-    response = supabase.table("data_kendaraan").select("Plat", "Pajak_Terhutang").eq("Plat", plat).execute()
+    response = supabase.table("kendaraan").select("plat", "pajak").eq("plat", plat).execute()
     data = response.data
     if data:
-        return data[0].get("Pajak_Terhutang", 0)
+        return data[0].get("pajak", 0)
     return 0  # default tidak ditemukan
 
 # ============================
-#UPDATE STATUS LUNAS
+# UPDATE STATUS LUNAS
 # ============================
 def update_status_lunas(plat):
-    data_bayar = supabase.table("riwayat_pembayaran").select("*").eq("Plat", plat).execute()
+    data_bayar = supabase.table("riwayat_pembayaran") \
+        .select("*") \
+        .eq("plat", plat) \
+        .execute()
+
     if data_bayar.data:
-        latest = sorted(data_bayar.data, key=lambda x: x['Tanggal'], reverse=True)[0]
-        if latest["Status"] == "Belum Lunas":
-            supabase.table("riwayat_pembayaran").update({"Status": "Lunas"}).eq("id", latest["id"]).execute()
+        latest = sorted(data_bayar.data, key=lambda x: x['tanggal_bayar'], reverse=True)[0]
+        pajak = latest.get("pajak", 0)
+        jumlah = latest.get("jumlah", 0)
+
+        if latest["status"] == "BELUM LUNAS" and jumlah >= pajak:
+            supabase.table("riwayat_pembayaran") \
+                .update({"status": "LUNAS"}) \
+                .eq("id", latest["id"]) \
+                .execute()
             return True
     return False
 
