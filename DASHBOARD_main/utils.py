@@ -6,6 +6,7 @@ import streamlit as st
 import pandas as pd #untuk DataFrame, manipulasi data Supabase
 import random # untuk generate no. resi
 from fpdf import FPDF 
+import httpx
 from datetime import datetime, timedelta, timezone
 from supabase import create_client, Client #untuk konek ke Supabase
 
