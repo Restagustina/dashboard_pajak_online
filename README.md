@@ -28,7 +28,7 @@ Proyek ini adalah aplikasi web berbasis Python + Streamlit untuk mempermudah pem
 ## Teknologi yang Digunakan
 - Python
 - Streamlit
-- Pandas & OpenPyXL
+- Supabase
 - FPDF (untuk cetak resi PDF)
 - IndoBERT (analisis sentimen)
 
@@ -41,5 +41,5 @@ Resta Gustina
 Mahasiswa Kerja Praktik di UPTB Samsat Palembang I 
 
 ## Catatan
-- Proyek ini menggunakan penyimpanan lokal (Excel), bukan database online.
-- Analisis sentimen dilakukan untuk menanggapi permasalahan SIGNAL secara data-driven.
+- Proyek ini menggunakan database online.
+- Analisis sentimen dilakukan untuk menanggapi permasalahan SIGNAL.
