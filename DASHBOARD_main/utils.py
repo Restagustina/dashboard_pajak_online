@@ -10,8 +10,8 @@ import httpx
 from datetime import datetime, timedelta, timezone
 from supabase import create_client #untuk konek ke Supabase
 
-SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://vyhdnlzjmzoatchtihgj.supabase.co") 
-SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ5aGRubHpqbXpvYXRjaHRpaGdqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ0NzE4ODAsImV4cCI6MjA3MDA0Nzg4MH0.HUBVYVPAMCwHITtMwGYx_9_t9drkVPhtRatwU30CjSo")
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://svsgfvjxuelwnpyxgjfi.supabase.co") 
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN2c2dmdmp4dWVsd25weXhnamZpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkyODU0NDcsImV4cCI6MjA4NDg2MTQ0N30.luoT78yqZbf_KOFHzDthDr-oXc1CFsRjy9es7u5sRVo")
 
 # Buat client Supabase dengan timeout lebih panjang
 # Buat httpx Client dengan timeout khusus
