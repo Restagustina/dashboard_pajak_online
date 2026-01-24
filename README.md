@@ -38,8 +38,8 @@ Aplikasi ini dapat diakses melalui:
 
 ## Developer
 Resta Gustina  
-Mahasiswa Kerja Praktik di UPTB Samsat Palembang I 
 
 ## Catatan
 - Proyek ini menggunakan database online.
+- Aplikasi ini masih bersifat Prototype
 - Analisis sentimen dilakukan untuk menanggapi permasalahan SIGNAL.
